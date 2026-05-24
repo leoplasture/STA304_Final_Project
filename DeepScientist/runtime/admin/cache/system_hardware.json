@@ -1,0 +1,234 @@
+{
+  "ok": true,
+  "generated_at": "2026-05-23T06:37:23+00:00",
+  "system": {
+    "generated_at": "2026-05-23T06:37:23+00:00",
+    "host": {
+      "hostname": "MagicLeo",
+      "platform": "Windows-11-10.0.22631-SP0",
+      "system": "Windows",
+      "release": "11",
+      "machine": "AMD64",
+      "python": "3.12.10"
+    },
+    "cpu": {
+      "model": "Intel64 Family 6 Model 186 Stepping 2, GenuineIntel",
+      "logical_cores": 16,
+      "physical_cores": null
+    },
+    "memory": {
+      "total_bytes": null,
+      "available_bytes": null,
+      "total_gb": null,
+      "available_gb": null
+    },
+    "disks": [
+      {
+        "mount": "\\",
+        "total_bytes": 880637112320,
+        "used_bytes": 596057325568,
+        "free_bytes": 284579786752,
+        "total_gb": 820.16,
+        "free_gb": 265.04
+      },
+      {
+        "mount": "D:\\ds_test\\DeepScientist",
+        "total_bytes": 880637112320,
+        "used_bytes": 596057325568,
+        "free_bytes": 284579786752,
+        "total_gb": 820.16,
+        "free_gb": 265.04
+      }
+    ],
+    "gpus": [],
+    "gpu_count": 0
+  },
+  "preferences": {
+    "gpu_selection_mode": "all",
+    "selected_gpu_ids": [],
+    "include_system_hardware_in_prompt": false,
+    "available_gpu_ids": [],
+    "available_gpu_count": 0,
+    "effective_gpu_ids": [],
+    "cuda_visible_devices": null
+  },
+  "memory_preferences": {
+    "read_visibility_mode": "independent"
+  },
+  "prompt_hardware_summary": "CPU: Intel64 Family 6 Model 186 Stepping 2, GenuineIntel (16 logical cores) | Memory: unknownGB | Disk: 265.04GB free on \\ | GPUs: no GPU detected | Selected GPUs: all",
+  "latest_sample": {
+    "recorded_at": "2026-05-23T06:36:29+00:00",
+    "cpu": {
+      "usage_percent": null,
+      "load_average": {
+        "one": null,
+        "five": null,
+        "fifteen": null
+      }
+    },
+    "memory": {
+      "total_gb": null,
+      "available_gb": null,
+      "used_gb": null,
+      "usage_percent": null
+    },
+    "disks": [
+      {
+        "mount": "\\",
+        "total_gb": 820.16,
+        "used_gb": 555.13,
+        "free_gb": 265.03,
+        "usage_percent": 67.69
+      },
+      {
+        "mount": "D:\\ds_test\\DeepScientist",
+        "total_gb": 820.16,
+        "used_gb": 555.13,
+        "free_gb": 265.03,
+        "usage_percent": 67.69
+      }
+    ],
+    "gpus": []
+  },
+  "recent_stats": {
+    "sample_count": 11,
+    "window_minutes": 60,
+    "latest_sample": {
+      "recorded_at": "2026-05-23T06:36:29+00:00",
+      "cpu": {
+        "usage_percent": null,
+        "load_average": {
+          "one": null,
+          "five": null,
+          "fifteen": null
+        }
+      },
+      "memory": {
+        "total_gb": null,
+        "available_gb": null,
+        "used_gb": null,
+        "usage_percent": null
+      },
+      "disks": [
+        {
+          "mount": "\\",
+          "total_gb": 820.16,
+          "used_gb": 555.13,
+          "free_gb": 265.03,
+          "usage_percent": 67.69
+        },
+        {
+          "mount": "D:\\ds_test\\DeepScientist",
+          "total_gb": 820.16,
+          "used_gb": 555.13,
+          "free_gb": 265.03,
+          "usage_percent": 67.69
+        }
+      ],
+      "gpus": []
+    },
+    "cpu": {
+      "latest_usage_percent": null,
+      "avg_usage_percent": null,
+      "max_usage_percent": null
+    },
+    "memory": {
+      "latest_usage_percent": null,
+      "avg_usage_percent": null,
+      "max_usage_percent": null,
+      "latest_used_gb": null,
+      "total_gb": null
+    },
+    "root_disk": {
+      "latest_usage_percent": 67.69,
+      "avg_usage_percent": 67.69,
+      "max_usage_percent": 67.69
+    },
+    "disks": [
+      {
+        "mount": "\\",
+        "latest_usage_percent": 67.69,
+        "avg_usage_percent": 67.69,
+        "max_usage_percent": 67.69,
+        "free_gb": 265.03
+      },
+      {
+        "mount": "D:\\ds_test\\DeepScientist",
+        "latest_usage_percent": 67.69,
+        "avg_usage_percent": 67.69,
+        "max_usage_percent": 67.69,
+        "free_gb": 265.03
+      }
+    ],
+    "gpus": [],
+    "series": [
+      {
+        "recorded_at": "2026-05-23T06:26:28+00:00",
+        "cpu_usage_percent": null,
+        "memory_usage_percent": null,
+        "root_disk_usage_percent": 67.69
+      },
+      {
+        "recorded_at": "2026-05-23T06:27:29+00:00",
+        "cpu_usage_percent": null,
+        "memory_usage_percent": null,
+        "root_disk_usage_percent": 67.69
+      },
+      {
+        "recorded_at": "2026-05-23T06:28:29+00:00",
+        "cpu_usage_percent": null,
+        "memory_usage_percent": null,
+        "root_disk_usage_percent": 67.69
+      },
+      {
+        "recorded_at": "2026-05-23T06:29:29+00:00",
+        "cpu_usage_percent": null,
+        "memory_usage_percent": null,
+        "root_disk_usage_percent": 67.69
+      },
+      {
+        "recorded_at": "2026-05-23T06:30:29+00:00",
+        "cpu_usage_percent": null,
+        "memory_usage_percent": null,
+        "root_disk_usage_percent": 67.69
+      },
+      {
+        "recorded_at": "2026-05-23T06:31:29+00:00",
+        "cpu_usage_percent": null,
+        "memory_usage_percent": null,
+        "root_disk_usage_percent": 67.69
+      },
+      {
+        "recorded_at": "2026-05-23T06:32:29+00:00",
+        "cpu_usage_percent": null,
+        "memory_usage_percent": null,
+        "root_disk_usage_percent": 67.69
+      },
+      {
+        "recorded_at": "2026-05-23T06:33:29+00:00",
+        "cpu_usage_percent": null,
+        "memory_usage_percent": null,
+        "root_disk_usage_percent": 67.69
+      },
+      {
+        "recorded_at": "2026-05-23T06:34:29+00:00",
+        "cpu_usage_percent": null,
+        "memory_usage_percent": null,
+        "root_disk_usage_percent": 67.69
+      },
+      {
+        "recorded_at": "2026-05-23T06:35:29+00:00",
+        "cpu_usage_percent": null,
+        "memory_usage_percent": null,
+        "root_disk_usage_percent": 67.69
+      },
+      {
+        "recorded_at": "2026-05-23T06:36:29+00:00",
+        "cpu_usage_percent": null,
+        "memory_usage_percent": null,
+        "root_disk_usage_percent": 67.69
+      }
+    ],
+    "log_path": "D:\\ds_test\\DeepScientist\\runtime\\admin\\hardware\\2026-05-23.jsonl"
+  }
+}

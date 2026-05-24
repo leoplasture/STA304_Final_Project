@@ -1,0 +1,8 @@
+{
+  "version": "1.6.0",
+  "latex": {
+    "available": true,
+    "compiler": "pdflatex",
+    "path": "C:\\Users\\pl050\\AppData\\Roaming\\TinyTeX\\bin\\windows\\pdflatex.EXE"
+  }
+}

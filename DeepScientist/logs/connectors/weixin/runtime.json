@@ -1,0 +1,8 @@
+{
+  "enabled": false,
+  "transport": "ilink_long_poll",
+  "connected": false,
+  "connection_state": "disabled",
+  "auth_state": "disabled",
+  "updated_at": "2026-05-23T06:32:35+00:00"
+}

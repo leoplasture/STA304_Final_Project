@@ -1,0 +1,28 @@
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "D:\ds_test\DeepScientist\runtime\python-env\Lib\site-packages\deepscientist\cli.py", line 704, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "D:\ds_test\DeepScientist\runtime\python-env\Lib\site-packages\deepscientist\cli.py", line 666, in main
+    return daemon_command(home, args.host, args.port, args.auth, args.auth_token, args.prompt_version, args.runner)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\ds_test\DeepScientist\runtime\python-env\Lib\site-packages\deepscientist\cli.py", line 329, in daemon_command
+    daemon = DaemonApp(
+             ^^^^^^^^^^
+  File "D:\ds_test\DeepScientist\runtime\python-env\Lib\site-packages\deepscientist\daemon\app.py", line 221, in __init__
+    self.skill_sync_summary = self.skill_installer.ensure_release_sync(
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\ds_test\DeepScientist\runtime\python-env\Lib\site-packages\deepscientist\skills\installer.py", line 173, in ensure_release_sync
+    summary["global"] = self.sync_global()
+                        ^^^^^^^^^^^^^^^^^^
+  File "D:\ds_test\DeepScientist\runtime\python-env\Lib\site-packages\deepscientist\skills\installer.py", line 44, in sync_global
+    claude_target = self._sync_claude_projection(bundle, claude_root)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\ds_test\DeepScientist\runtime\python-env\Lib\site-packages\deepscientist\skills\installer.py", line 368, in _sync_claude_projection
+    self._write_bytes_atomic(target, self._render_claude_projection(bundle).encode("utf-8"))
+  File "D:\ds_test\DeepScientist\runtime\python-env\Lib\site-packages\deepscientist\skills\installer.py", line 419, in _write_bytes_atomic
+    temp_path.replace(path)
+  File "D:\Python312\Lib\pathlib.py", line 1376, in replace
+    os.replace(self, target)
+PermissionError: [WinError 5] \u62d2\u7edd\u8bbf\u95ee\u3002: 'C:\\Users\\pl050\\.claude\\agents\\.deepscientist-decision.md.tmp-e8503eebf47944d68dd4829f65bb0305' -> 'C:\\Users\\pl050\\.claude\\agents\\deepscientist-decision.md'
