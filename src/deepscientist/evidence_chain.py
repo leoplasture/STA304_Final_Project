@@ -256,8 +256,13 @@ def validate_store(quest_root: Path) -> dict[str, Any]:
             candidate = quest_root / Path(sidecar_path)
             if not candidate.exists():
                 errors.append(f"{label} sidecar_path does not exist: {sidecar_path}")
-        if str(entry.get("event_type") or "") not in {"runner.tool_call", "runner.tool_result"}:
-            warnings.append(f"{label} unexpected event_type `{entry.get('event_type')}`")
+        source_type = str(entry.get("source_type") or "")
+        is_connector = source_type.startswith("connector_")
+        event_type = str(entry.get("event_type") or "")
+        if event_type and event_type not in {"runner.tool_call", "runner.tool_result"}:
+            warnings.append(f"{label} unexpected event_type `{event_type}`")
+        elif not event_type and not is_connector:
+            warnings.append(f"{label} missing event_type for non-connector entry")
 
     return {
         "ok": not errors,
@@ -367,6 +372,210 @@ def query_events(
         normalized = str(event_type).strip().lower()
         entries = [item for item in entries if str(item.get("event_type") or "").strip().lower() == normalized]
     return entries
+
+
+def _image_metadata(file_path: Path) -> dict[str, Any]:
+    """Read image metadata (dimensions, format, SHA256). Degrades gracefully without PIL."""
+    meta: dict[str, Any] = {
+        "width": None,
+        "height": None,
+        "format": None,
+        "mode": None,
+        "size_bytes": None,
+        "sha256": None,
+    }
+    try:
+        raw = file_path.read_bytes()
+        meta["size_bytes"] = len(raw)
+        meta["sha256"] = hashlib.sha256(raw).hexdigest()
+    except Exception:
+        return meta
+
+    try:
+        from PIL import Image
+
+        with Image.open(file_path) as img:
+            meta["width"] = img.width
+            meta["height"] = img.height
+            meta["format"] = img.format
+            meta["mode"] = img.mode
+    except Exception:
+        pass
+    return meta
+
+
+def record_connector_event(
+    quest_root: Path,
+    *,
+    message: dict[str, Any],
+    materialized_attachments: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Record connector (QQ) messages as evidence entries.
+
+    Creates a connector_text entry for text content and connector_image
+    entries for image attachments. Evidence IDs use the ``E{idx:03d}`` and
+    ``E{idx:03d}-img`` format recognised by the audit module.
+    """
+    if not isinstance(message, dict):
+        return []
+
+    store = _load_store(quest_root)
+    entries: list[dict[str, Any]] = [dict(e) for e in (store.get("entries") or []) if isinstance(e, dict)]
+
+    # Determine next index by scanning existing E-prefixed evidence IDs
+    max_idx = 0
+    for e in entries:
+        eid = str(e.get("evidence_id") or "")
+        if eid.startswith("E"):
+            # Strip -img suffix if present, then parse the number
+            num_part = eid[1:].split("-")[0]
+            try:
+                max_idx = max(max_idx, int(num_part))
+            except ValueError:
+                pass
+    next_index = max_idx + 1
+
+    text = str(message.get("text") or "").strip()
+    sender_id = str(message.get("sender_id") or "").strip() or None
+    sender_name = str(message.get("sender_name") or "").strip() or None
+    conversation_id = str(message.get("conversation_id") or "").strip() or None
+    message_id = str(message.get("message_id") or "").strip() or None
+    created_at = str(message.get("created_at") or utc_now())
+
+    recorded: list[dict[str, Any]] = []
+    base_index = next_index  # same message shares the same index
+
+    # Text entry
+    if text:
+        evidence_id = f"E{base_index:03d}"
+        entry = {
+            "schema_version": EVIDENCE_SCHEMA_VERSION,
+            "evidence_id": evidence_id,
+            "run_id": message_id or evidence_id,
+            "event_id": None,
+            "tool_call_id": None,
+            "event_type": None,
+            "tool_name": "connector.qq",
+            "created_at": created_at,
+            "source_type": "connector_text",
+            "source_ref": {
+                "kind": "connector",
+                "path": f"qq:{conversation_id or ''}:{message_id or ''}",
+                "line": None,
+                "url": None,
+                "page": None,
+                "sidecar_path": None,
+                "event_id": None,
+                "tool_call_id": None,
+            },
+            "args": {
+                "text": _output_preview(text),
+                "sender_id": sender_id,
+                "sender_name": sender_name,
+                "conversation_id": conversation_id,
+                "message_id": message_id,
+            },
+            "output_preview": _output_preview(text),
+            "summary": _output_preview(text),
+            "sidecar_path": None,
+            "status": "ok",
+            "error": None,
+            "recorded_at": utc_now(),
+        }
+        entry["payload_sha256"] = _entry_payload_sha256(entry)
+        entries.append(entry)
+        recorded.append(entry)
+
+    # Image entries
+    for att in (materialized_attachments or []):
+        if not isinstance(att, dict):
+            continue
+        content_type = str(att.get("content_type") or "").strip().lower()
+        is_image = content_type.startswith("image/") or bool(
+            att.get("url") and any(
+                str(att.get("url") or "").lower().endswith(ext)
+                for ext in (".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp")
+            )
+        )
+        if not is_image:
+            continue
+
+        file_path_str = str(att.get("path") or "").strip()
+        file_path = Path(file_path_str) if file_path_str else None
+        img_meta = _image_metadata(file_path) if (file_path and file_path.exists()) else {}
+
+        evidence_id = f"E{base_index:03d}-img"
+        entry = {
+            "schema_version": EVIDENCE_SCHEMA_VERSION,
+            "evidence_id": evidence_id,
+            "run_id": message_id or evidence_id,
+            "event_id": None,
+            "tool_call_id": None,
+            "event_type": None,
+            "tool_name": "connector.qq.image",
+            "created_at": created_at,
+            "source_type": "connector_image",
+            "source_ref": {
+                "kind": "connector_image",
+                "path": att.get("quest_relative_path") or str(att.get("path") or ""),
+                "line": None,
+                "url": str(att.get("url") or "").strip() or None,
+                "page": None,
+                "sidecar_path": None,
+                "event_id": None,
+                "tool_call_id": None,
+            },
+            "args": {
+                "original_url": str(att.get("url") or "").strip() or None,
+                "content_type": str(att.get("content_type") or "").strip() or None,
+                "filename": str(att.get("name") or "").strip() or None,
+                "size_bytes": img_meta.get("size_bytes") or att.get("size_bytes"),
+                "width": img_meta.get("width"),
+                "height": img_meta.get("height"),
+                "format": img_meta.get("format"),
+                "sha256": img_meta.get("sha256"),
+                "sender_id": sender_id,
+                "sender_name": sender_name,
+                "conversation_id": conversation_id,
+                "message_id": message_id,
+            },
+            "output_preview": _format_image_preview(att, img_meta),
+            "summary": _format_image_preview(att, img_meta),
+            "sidecar_path": None,
+            "status": "ok" if (file_path and file_path.exists()) else "error",
+            "error": None if (file_path and file_path.exists()) else "image file not found on disk",
+            "recorded_at": utc_now(),
+        }
+        entry["payload_sha256"] = _entry_payload_sha256(entry)
+        entries.append(entry)
+        recorded.append(entry)
+
+    if recorded:
+        store["entries"] = _reindex_entries(entries)
+        store["generated_at"] = str(store.get("generated_at") or utc_now())
+        _save_store(quest_root, store)
+
+    return recorded
+
+
+def _format_image_preview(att: dict[str, Any], img_meta: dict[str, Any]) -> str:
+    name = str(att.get("name") or "image")
+    width = img_meta.get("width")
+    height = img_meta.get("height")
+    fmt = img_meta.get("format") or ""
+    size = img_meta.get("size_bytes") or att.get("size_bytes")
+    parts = [f"image: {name}"]
+    if width and height:
+        parts.append(f"{width}x{height}")
+    if fmt:
+        parts.append(fmt)
+    if size:
+        try:
+            kb = int(size) / 1024
+            parts.append(f"{kb:.1f}KB" if kb < 1024 else f"{kb / 1024:.1f}MB")
+        except Exception:
+            pass
+    return " | ".join(parts)
 
 
 def export_store(quest_root: Path) -> dict[str, Any]:
