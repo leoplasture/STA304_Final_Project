@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from ..artifact import ArtifactService
+from ..evidence_chain import record_event as record_evidence_event
 from ..gitops import export_git_graph
 from ..process_control import process_session_popen_kwargs
 from ..prompts import PromptBuilder
@@ -227,6 +228,14 @@ class SimpleCliRunner:
                     translation_state=translation_state,
                 )
                 for event in translated_events:
+                    try:
+                        record_evidence_event(
+                            request.quest_root,
+                            run_id=request.run_id,
+                            event=event,
+                        )
+                    except Exception:
+                        pass
                     append_jsonl(quest_events, event)
                 output_parts.extend(part.strip() for part in text_parts if isinstance(part, str) and part.strip())
                 if translation_state.get("abort_process") and process.poll() is None:

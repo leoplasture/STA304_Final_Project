@@ -16,6 +16,7 @@ from ..codex_cli_compat import (
     normalize_codex_reasoning_effort,
     provider_profile_metadata_from_home,
 )
+from ..evidence_chain import record_event as record_evidence_event
 from ..config import ConfigManager
 from ..evidence_packets import compact_runner_tool_event
 from ..gitops import export_git_graph
@@ -1168,6 +1169,14 @@ class CodexRunner:
                                 telemetry.get("compacted_tool_result_count") or 0
                             ) + 1
                         _record_tool_budget_event(telemetry, tool_event)
+                    try:
+                        record_evidence_event(
+                            request.quest_root,
+                            run_id=request.run_id,
+                            event=tool_event,
+                        )
+                    except Exception:
+                        pass
                     append_jsonl(quest_events, tool_event)
                 message_events, message_output_parts = _message_events(
                     payload,
