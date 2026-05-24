@@ -1,0 +1,40 @@
+{
+  "last_conversation_id": "qq:direct:47212B4DC467EB2C3594D6D40FA73034",
+  "last_message_id": "ROBOT1.0_DN43WAQSmXlPC1UCTcQkT2q2ORDRHYv0XN1pWJRh7DiLmn3vSzLbINmRBzctHpEcNX6Xx.QwqT4mkpuRq8DoMg.Nu2ZHtBwpRjRcxe5DnDY!",
+  "updated_at": "2026-05-23T06:32:13+00:00",
+  "recent_conversations": [
+    {
+      "conversation_id": "qq:direct:47212B4DC467EB2C3594D6D40FA73034",
+      "connector": "qq",
+      "chat_type": "direct",
+      "chat_id": "47212B4DC467EB2C3594D6D40FA73034",
+      "chat_id_raw": "47212B4DC467EB2C3594D6D40FA73034",
+      "profile_id": "qq-profile-a2790dcf",
+      "label": "direct · 47212B4DC467EB2C3594D6D40FA73034",
+      "updated_at": "2026-05-23T06:32:13+00:00",
+      "source": "recent_inbound",
+      "profile_label": "DeepScientist · 1904036854",
+      "sender_id": "47212B4DC467EB2C3594D6D40FA73034",
+      "sender_name": "47212B4DC467EB2C3594D6D40FA73034",
+      "message_id": "ROBOT1.0_DN43WAQSmXlPC1UCTcQkT2q2ORDRHYv0XN1pWJRh7DiLmn3vSzLbINmRBzctHpEcNX6Xx.QwqT4mkpuRq8DoMg.Nu2ZHtBwpRjRcxe5DnDY!"
+    }
+  ],
+  "known_targets": [
+    {
+      "conversation_id": "qq:direct:47212B4DC467EB2C3594D6D40FA73034",
+      "connector": "qq",
+      "chat_type": "direct",
+      "chat_id": "47212B4DC467EB2C3594D6D40FA73034",
+      "chat_id_raw": "47212B4DC467EB2C3594D6D40FA73034",
+      "profile_id": "qq-profile-a2790dcf",
+      "label": "direct · 47212B4DC467EB2C3594D6D40FA73034",
+      "updated_at": "2026-05-23T06:32:13+00:00",
+      "source": "outbound_delivery",
+      "profile_label": "DeepScientist · 1904036854",
+      "sender_id": "47212B4DC467EB2C3594D6D40FA73034",
+      "sender_name": "47212B4DC467EB2C3594D6D40FA73034",
+      "message_id": "ROBOT1.0_DN43WAQSmXlPC1UCTcQkT2q2ORDRHYv0XN1pWJRh7DiLmn3vSzLbINmRBzctHpEcNX6Xx.QwqT4mkpuRq8DoMg.Nu2ZHtBwpRjRcxe5DnDY!",
+      "first_seen_at": "2026-05-23T06:32:13+00:00"
+    }
+  ]
+}

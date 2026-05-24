@@ -1,0 +1,15 @@
+{
+  "pid": 17540,
+  "host": "0.0.0.0",
+  "port": 20999,
+  "url": "http://127.0.0.1:20999",
+  "bind_url": "http://0.0.0.0:20999",
+  "launch_url": "http://127.0.0.1:20999",
+  "bind_launch_url": "http://0.0.0.0:20999",
+  "log_path": "D:\\ds_test\\DeepScientist\\logs\\daemon.log",
+  "started_at": "2026-05-23T06:26:21.145Z",
+  "home": "D:\\ds_test\\DeepScientist",
+  "daemon_id": "97a2b58a-3e02-4062-8518-1231289e63ef",
+  "auth_enabled": false,
+  "auth_token": null
+}

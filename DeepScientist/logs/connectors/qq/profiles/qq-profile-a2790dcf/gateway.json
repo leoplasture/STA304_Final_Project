@@ -1,0 +1,15 @@
+{
+  "enabled": true,
+  "connected": false,
+  "mode": "direct",
+  "started_at": "2026-05-23T06:32:35+00:00",
+  "updated_at": "2026-05-23T09:40:29+00:00",
+  "gateway_url": "wss://api.sgroup.qq.com/websocket",
+  "last_error": "<urlopen error [WinError 10061] 由于目标计算机积极拒绝，无法连接。>",
+  "session_id": "6feeacd8-14bb-44c0-9fd1-45f9ed6b792b",
+  "last_event_at": "2026-05-23T06:32:13+00:00",
+  "last_event_type": "C2C_MESSAGE_CREATE",
+  "last_conversation_id": "qq:direct:47212B4DC467EB2C3594D6D40FA73034",
+  "stopped_at": "2026-05-23T06:32:35+00:00",
+  "resumed_at": "2026-05-23T08:20:10+00:00"
+}

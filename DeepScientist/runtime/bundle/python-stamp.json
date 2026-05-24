@@ -1,0 +1,17 @@
+{
+  "runtimeManager": "uv",
+  "version": "1.6.0",
+  "pyprojectHash": "6fe3a77bbda37ad7388409d2eb42c8b6b1ba8df3771f627825647ebd2614fa81",
+  "uvLockHash": "866cd07d56cca0f20785e4806fef7520c3d94fd8fd0cde86f1c247d708d32c7e",
+  "editable": false,
+  "sourceTreeHash": "9c96f01b6b60318e3d335c14078be383c3accc2a0d82234ad4d22b3f8b219ff9",
+  "uvVersion": "uv 0.11.16 (135a36367 2026-05-21 x86_64-pc-windows-msvc)",
+  "envPath": "D:\\ds_test\\DeepScientist\\runtime\\python-env",
+  "source": {
+    "kind": "system",
+    "source": "path",
+    "sourceExecutable": "D:\\Python312\\python.exe",
+    "sourceVersion": "3.12.10",
+    "sourceMajorMinor": "3.12"
+  }
+}
