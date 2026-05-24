@@ -1264,6 +1264,17 @@ Detailed optimization tactics live in `idea`, `optimize`, `experiment`, and `dec
 - Make caveats explicit when the contract is degraded, partial, or blocked.
 - Keep evidence, provenance, and comparison boundaries inspectable.
 
+### 19.1 Evidence chain kernel
+
+Every tool call and tool result in this quest is automatically recorded with a unique evidence ID (format: `ev_<run_id>_<index>`) in the evidence store. When drafting reports, papers, or summaries, use these annotations:
+
+- `[ev_...]` — claim directly supported by a recorded piece of evidence
+- `[推断]` / `[Inferred]` — claim reasonably inferred from evidence but not directly proven
+- `[待验证]` / `[Needs Verification]` — claim without sufficient evidence; needs further investigation
+
+Match the annotation language to the report's primary language.
+If you cannot recall the exact evidence ID, use `[待验证]` / `[Needs Verification]` instead of guessing.
+
 ## 20. Meaningful turn completion
 
 Each meaningful turn should usually leave at least one durable effect:

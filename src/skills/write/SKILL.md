@@ -14,6 +14,57 @@ skill_role: stage
 ## One-Sentence Summary
 - Refresh the paper contract first, then draft section-by-section from durable evidence; if evidence, figures, or citations are not ready, repair or route back instead of writing around the gap.
 
+## Evidence Chain Protocol
+
+Every claim in your output must be traceable to a recorded piece of evidence. Follow these rules whenever you draft prose that contains factual assertions, measurements, or conclusions drawn from tool outputs.
+
+### Three-Level Annotation
+
+For every factual or analytical sentence, apply exactly one of these annotations at the end of the sentence:
+
+| Annotation | Meaning | When to use |
+|------------|---------|-------------|
+| `[E...]` or `[ev_...]` | **Directly supported** | The claim comes from a recorded tool output, paper text, experiment log, or code result that exists in the evidence store |
+| `[推断]` / `[Inferred]` | **Reasonably inferred** | You deduced this from available evidence, but no single piece of evidence directly states it |
+| `[待验证]` / `[Needs Verification]` | **Not yet verified** | The claim may be plausible but you lack sufficient evidence — this is a knowledge gap, not a failure |
+
+Match the annotation language to the report's primary language: use Chinese annotations in Chinese reports, English annotations in English reports.
+
+### Evidence ID Reference
+
+- Each tool call and tool result is automatically assigned an evidence ID by the runtime (format: `ev_<run_id>_<index>`).
+- When you cite a specific tool output, use the evidence ID that was shown alongside that output, e.g. `[ev_run-a_000003]`.
+- If you are citing a claim that spans multiple pieces of evidence, list all relevant IDs: `[ev_run-a_000003][ev_run-a_000007]`.
+- Never invent an evidence ID. If you cannot recall the exact ID, use `[待验证]` / `[Needs Verification]` instead of guessing.
+
+### Evidence Table Requirement
+
+At the end of every report, paper section draft, or research summary, include an evidence table:
+
+```
+### Evidence Table
+
+| Evidence ID | Source | Location | What it supports |
+|-------------|--------|----------|------------------|
+| ev_run-a_000001 | artifact.arxiv | 1706.03762 p.3 | Encoder-decoder structure |
+| ev_run-a_000003 | bash_exec | run_001/log.txt L45 | BLEU=28.4 on WMT14 |
+```
+
+If no tool calls were made or no evidence was recorded, state that explicitly: `*(No evidence recorded for this report)*`.
+
+### Failure and Error Handling
+
+- If a tool call returned an error (status=error in the evidence store), mark the evidence ID with `[来源不可用]` / `[Source Unavailable]` and do not use it to support a claim.
+- If a tool returned empty output, record it but cite it only for negative results ("no results found [ev_...]").
+- If you are unsure whether a piece of evidence supports a claim, downgrade to `[Inferred]` or `[Needs Verification]` (or `[推断]` / `[待验证]` in Chinese reports).
+
+### AVOID
+
+- Do not write factual claims without annotation.
+- Do not invent evidence IDs.
+- Do not cite evidence that was recorded but returned an error status.
+- Do not treat `[待验证]` / `[Needs Verification]` as a failure — it is honest scientific communication.
+
 ## Pre-write Revision Strategy Gate
 
 Before editing a manuscript, first produce a concrete revision strategy from the current evidence state.
