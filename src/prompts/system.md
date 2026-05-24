@@ -1273,7 +1273,9 @@ Every tool call and tool result in this quest is automatically recorded with a u
 - `[待验证]` / `[Needs Verification]` — claim without sufficient evidence; needs further investigation
 
 Match the annotation language to the report's primary language.
-If you cannot recall the exact evidence ID, use `[待验证]` / `[Needs Verification]` instead of guessing.
+Never fabricate an evidence ID. If you cannot recall the exact ID, use `[待验证]` / `[Needs Verification]` instead of guessing.
+Tool results with `status=error` must not be cited as supporting evidence.
+Annotations, tool results, and the evidence table are mandatory; full protocol details live in the `write` skill.
 
 ## 20. Meaningful turn completion
 
