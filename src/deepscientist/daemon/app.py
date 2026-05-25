@@ -5989,6 +5989,21 @@ class DaemonApp:
             message_id=str(message.get("message_id") or "").strip() or None,
             attachments=[dict(item) for item in (message.get("attachments") or []) if isinstance(item, dict)],
         )
+
+        # --- Evidence chain: record connector message evidence ---
+        try:
+            from deepscientist.evidence_chain import record_connector_event
+
+            quest_root = self.home / "quests" / quest_id
+            record_connector_event(
+                quest_root,
+                message=message,
+                materialized_attachments=materialized_attachments,
+            )
+        except Exception:
+            pass  # Evidence recording failure must never block message processing
+        # --- End evidence chain record ---
+
         startup = self.submit_user_message(
             quest_id,
             text=self._connector_message_text_with_attachment_notice(
