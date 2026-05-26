@@ -902,6 +902,14 @@ class CodexRunner:
         self._active_processes: dict[str, subprocess.Popen[str]] = {}
 
     @staticmethod
+    def _resolve_mcp_python() -> str:
+        if sys.platform == "win32":
+            p = Path(sys.executable)
+            if p.name.lower() == "pythonw.exe":
+                return str(p.with_name("python.exe"))
+        return sys.executable
+
+    @staticmethod
     def _subprocess_popen_kwargs(*, workspace_root: Path, env: dict[str, str]) -> dict[str, Any]:
         return {
             "cwd": str(workspace_root),
@@ -1577,6 +1585,10 @@ class CodexRunner:
             shared_env["DS_CUSTOM_PROFILE"] = custom_profile
         if pythonpath:
             shared_env["PYTHONPATH"] = pythonpath
+        _mcp_python_dir = str(Path(self._resolve_mcp_python()).parent)
+        _existing_path = os.environ.get("PATH", "")
+        if _mcp_python_dir not in _existing_path.split(os.pathsep):
+            shared_env["PATH"] = os.pathsep.join([_mcp_python_dir, _existing_path])
 
         server_names = builtin_mcp_server_names_for_custom_profile(custom_profile)
         tool_approvals = _builtin_mcp_tool_approvals_for_profile(custom_profile)
@@ -1607,7 +1619,7 @@ class CodexRunner:
         lines = [
             f"[mcp_servers.{name}]",
             'transport = "stdio"',
-            f'command = "{sys.executable}"',
+            f'command = "{self._resolve_mcp_python()}"',
             f"args = [{', '.join(json.dumps(item) for item in args)}]",
         ]
         if tool_timeout_sec is not None:

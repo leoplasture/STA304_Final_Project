@@ -69,6 +69,14 @@ class OpenCodeRunner(SimpleCliRunner):
             return None
         return timeout if timeout > 0 else None
 
+    @staticmethod
+    def _resolve_mcp_python() -> str:
+        if sys.platform == "win32":
+            p = Path(sys.executable)
+            if p.name.lower() == "pythonw.exe":
+                return str(p.with_name("python.exe"))
+        return sys.executable
+
     def _prepare_runtime(
         self,
         *,
@@ -111,6 +119,10 @@ class OpenCodeRunner(SimpleCliRunner):
             shared_env["DS_CUSTOM_PROFILE"] = custom_profile
         if pythonpath:
             shared_env["PYTHONPATH"] = pythonpath
+        _mcp_python_dir = str(Path(self._resolve_mcp_python()).parent)
+        _existing_path = os.environ.get("PATH", "")
+        if _mcp_python_dir not in _existing_path.split(os.pathsep):
+            shared_env["PATH"] = os.pathsep.join([_mcp_python_dir, _existing_path])
         server_names = builtin_mcp_server_names_for_custom_profile(custom_profile)
         mcp_timeout_ms = self._positive_timeout_ms(resolved_runner_config.get("mcp_timeout_ms"))
         merged_config = {
@@ -122,7 +134,7 @@ class OpenCodeRunner(SimpleCliRunner):
                         "type": "local",
                         "enabled": True,
                         "command": [
-                            sys.executable,
+                            self._resolve_mcp_python(),
                             "-m",
                             "deepscientist.mcp.server",
                             "--namespace",

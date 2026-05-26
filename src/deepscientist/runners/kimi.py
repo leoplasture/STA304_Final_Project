@@ -157,10 +157,21 @@ class KimiRunner(SimpleCliRunner):
         if pythonpath:
             shared_env["PYTHONPATH"] = pythonpath
         server_names = builtin_mcp_server_names_for_custom_profile(custom_profile)
+        if sys.platform == "win32":
+            _mcp_python = Path(sys.executable)
+            if _mcp_python.name.lower() == "pythonw.exe":
+                _mcp_python = _mcp_python.with_name("python.exe")
+            _mcp_python = str(_mcp_python)
+        else:
+            _mcp_python = sys.executable
+        _mcp_python_dir = str(Path(_mcp_python).parent)
+        _existing_path = os.environ.get("PATH", "")
+        if _mcp_python_dir not in _existing_path.split(os.pathsep):
+            shared_env["PATH"] = os.pathsep.join([_mcp_python_dir, _existing_path])
         mcp_config = {
             "mcpServers": {
                 name: {
-                    "command": sys.executable,
+                    "command": _mcp_python,
                     "args": ["-m", "deepscientist.mcp.server", "--namespace", name],
                     "env": shared_env,
                 }

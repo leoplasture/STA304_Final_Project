@@ -153,10 +153,29 @@ class ClaudeRunner(SimpleCliRunner):
         if pythonpath:
             shared_env["PYTHONPATH"] = pythonpath
         server_names = builtin_mcp_server_names_for_custom_profile(custom_profile)
+        if sys.platform == "win32":
+            _mcp_python = Path(sys.executable)
+            if _mcp_python.name.lower() == "pythonw.exe":
+                _mcp_python = _mcp_python.with_name("python.exe")
+            _mcp_python = str(_mcp_python)
+        else:
+            _mcp_python = sys.executable
+        _mcp_python_dir = str(Path(_mcp_python).parent)
+        _existing_path = os.environ.get("PATH", "")
+        _filtered_parts = [
+            p for p in _existing_path.split(os.pathsep)
+            if p and "python" not in p.lower()
+        ]
+        _filtered_path = os.pathsep.join([_mcp_python_dir] + _filtered_parts)
+        shared_env["PATH"] = _filtered_path
+        _ds_tmp = str(self.home / "tmp")
+        for _tk in ("TMPDIR", "TEMP", "TMP"):
+            if _tk not in shared_env:
+                shared_env[_tk] = _ds_tmp
         mcp_config = {
             "mcpServers": {
                 name: {
-                    "command": sys.executable,
+                    "command": _mcp_python,
                     "args": ["-m", "deepscientist.mcp.server", "--namespace", name],
                     "env": shared_env,
                 }
@@ -205,6 +224,7 @@ class ClaudeRunner(SimpleCliRunner):
             permission_mode,
             "--mcp-config",
             str(mcp_config_path),
+            "--strict-mcp-config",
             "--allowedTools",
             ",".join(f"mcp__{name}" for name in server_names),
             "--disallowedTools",
