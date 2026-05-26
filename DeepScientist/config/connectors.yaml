@@ -9,7 +9,7 @@ qq:
   app_secret_env: null
   bot_name: DeepScientist
   command_prefix: /
-  main_chat_id: null
+  main_chat_id: 47212B4DC467EB2C3594D6D40FA73034
   require_at_in_groups: true
   auto_bind_dm_to_active_quest: true
   gateway_restart_on_config_change: true
@@ -21,12 +21,12 @@ qq:
   enable_file_upload_experimental: false
   profiles:
   - profile_id: qq-profile-a2790dcf
-    enabled: true
+    enabled: false
     app_id: '1904036854'
     app_secret: 421112357ADHLQWcjqy6FOYju6IViwAP
     app_secret_env: null
     bot_name: DeepScientist
-    main_chat_id: null
+    main_chat_id: 47212B4DC467EB2C3594D6D40FA73034
 weixin:
   enabled: false
   transport: ilink_long_poll
