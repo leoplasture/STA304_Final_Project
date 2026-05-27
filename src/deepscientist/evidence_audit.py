@@ -28,7 +28,7 @@ class AuditResult:
         return self.supported_count + self.inferred_count + self.unverified_count
 
 
-_EVIDENCE_ID_PATTERN = re.compile(r"\[(ev_[^\]]+|E\d+(?:-img)?)\]")
+_EVIDENCE_ID_PATTERN = re.compile(r"\[(ev_[^\]]+|E\d+(?:-img|-pdf)?)\]")
 _INFERRED_PATTERN = re.compile(r"\[(?:推断|Inferred)\]")
 _UNVERIFIED_PATTERN = re.compile(r"\[(?:待验证|Needs Verification)\]")
 _ANY_ANNOTATION = re.compile(r"\[(?:ev_|E\d|推断|Inferred|待验证|Needs Verification)")

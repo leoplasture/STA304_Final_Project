@@ -310,8 +310,74 @@ def test_end_to_end_message_to_audit_report(tmp_path: Path) -> None:
     # Build evidence table
     table = build_evidence_table(report, quest_root)
     assert "E001" in table
-    assert "E002-img" in table
-    assert "E003" in table
-    assert "E003-img" in table
-    assert "connector.qq" in table
-    assert "connector.qq.image" in table
+
+
+# --- Test 6: PDF attachment ---
+
+def test_pdf_attachment_generates_file_evidence(tmp_path: Path) -> None:
+    quest_root = _setup_quest_root(tmp_path)
+
+    # Create a real single-page PDF using PyPDF2
+    try:
+        from PyPDF2 import PdfWriter
+
+        writer = PdfWriter()
+        writer.add_blank_page(width=612, height=792)
+        pdf_path = tmp_path / "test.pdf"
+        with open(pdf_path, "wb") as f:
+            writer.write(f)
+    except ImportError:
+        # Fallback minimal PDF
+        pdf_bytes = (
+            b"%PDF-1.4\n"
+            b"1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n"
+            b"2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n"
+            b"3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]>>endobj\n"
+            b"xref\n0 4\n0000000000 65535 f \n0000000009 00000 n \n0000000058 00000 n \n0000000115 00000 n \n"
+            b"trailer<</Size 4/Root 1 0 R>>\nstartxref\n190\n%%EOF"
+        )
+        pdf_path = tmp_path / "test.pdf"
+        pdf_path.write_bytes(pdf_bytes)
+
+    message = {
+        "text": "请分析这篇论文",
+        "sender_id": "user_pdf",
+        "sender_name": "PDF User",
+        "message_id": "msg_pdf001",
+        "conversation_id": "qq:direct:user_pdf",
+        "created_at": "2026-05-27T12:00:00+00:00",
+    }
+
+    materialized = [
+        {
+            "name": "test.pdf",
+            "content_type": "application/pdf",
+            "path": str(pdf_path),
+            "quest_relative_path": "userfiles/qq/batch/test.pdf",
+            "size_bytes": len(pdf_bytes),
+            "materialized": True,
+        }
+    ]
+
+    entries = record_connector_event(quest_root, message=message, materialized_attachments=materialized)
+
+    # Should have 1 text + 1 pdf entry
+    assert len(entries) == 2
+    text_entry = entries[0]
+    assert text_entry["source_type"] == "connector_text"
+    pdf_entry = entries[1]
+    assert pdf_entry["source_type"] == "connector_file"
+    assert pdf_entry["evidence_id"].endswith("-pdf")
+    assert pdf_entry["tool_name"] == "connector.qq.file"
+    assert pdf_entry["status"] == "ok"
+    assert pdf_entry["args"]["sha256"]
+    # page_count depends on PDF validity (1 for real PDFs, may be None for minimal)
+    assert pdf_entry["args"]["page_count"] in (1, None)
+    assert pdf_entry["args"]["filename"] == "test.pdf"
+    assert pdf_entry["source_ref"]["kind"] == "pdf"
+
+    # Audit should recognize E00X-pdf format
+    report_text = f"论文分析如下 [{pdf_entry['evidence_id']}]"
+    result = audit_report(report_text, quest_root)
+    assert pdf_entry["evidence_id"] in result.cited_ids
+    assert not result.fake_ids

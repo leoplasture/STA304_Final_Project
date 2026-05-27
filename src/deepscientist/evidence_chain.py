@@ -404,6 +404,58 @@ def _image_metadata(file_path: Path) -> dict[str, Any]:
     return meta
 
 
+def _pdf_metadata(file_path: Path) -> dict[str, Any]:
+    """Read PDF metadata: page count, SHA256, file size."""
+    meta: dict[str, Any] = {
+        "page_count": None,
+        "size_bytes": None,
+        "sha256": None,
+    }
+    try:
+        raw = file_path.read_bytes()
+        meta["size_bytes"] = len(raw)
+        meta["sha256"] = hashlib.sha256(raw).hexdigest()
+    except Exception:
+        return meta
+
+    try:
+        from PyPDF2 import PdfReader
+
+        reader = PdfReader(str(file_path))
+        meta["page_count"] = len(reader.pages)
+    except Exception:
+        pass
+    return meta
+
+
+def _extract_pdf_text_sidecar(file_path: Path, quest_root: Path) -> str | None:
+    """Extract text from a PDF and write to a .txt sidecar file.
+    Returns the quest-relative path to the sidecar, or None on failure."""
+    try:
+        from PyPDF2 import PdfReader
+
+        reader = PdfReader(str(file_path))
+        pages: list[str] = []
+        for i, page in enumerate(reader.pages):
+            text = (page.extract_text() or "").strip()
+            if text:
+                pages.append(f"--- Page {i + 1} ---\n{text}")
+        if not pages:
+            return None
+        full_text = "\n\n".join(pages)
+        sidecar_dir = _sidecar_dir(quest_root)
+        sidecar_dir.mkdir(parents=True, exist_ok=True)
+        stem = file_path.stem
+        sidecar_path = sidecar_dir / f"{stem}_pdf_text.txt"
+        sidecar_path.write_text(full_text, encoding="utf-8")
+        try:
+            return str(sidecar_path.relative_to(quest_root))
+        except ValueError:
+            return str(sidecar_path)
+    except Exception:
+        return None
+
+
 def record_connector_event(
     quest_root: Path,
     *,
@@ -545,6 +597,76 @@ def record_connector_event(
             "sidecar_path": None,
             "status": "ok" if (file_path and file_path.exists()) else "error",
             "error": None if (file_path and file_path.exists()) else "image file not found on disk",
+            "recorded_at": utc_now(),
+        }
+        entry["payload_sha256"] = _entry_payload_sha256(entry)
+        entries.append(entry)
+        recorded.append(entry)
+
+    # PDF attachments
+    for att in (materialized_attachments or []):
+        if not isinstance(att, dict):
+            continue
+        content_type = str(att.get("content_type") or "").strip().lower()
+        is_pdf = content_type == "application/pdf" or bool(
+            att.get("url") and str(att.get("url") or "").lower().endswith(".pdf")
+        ) or bool(
+            att.get("name") and str(att.get("name") or "").lower().endswith(".pdf")
+        )
+        if not is_pdf:
+            continue
+
+        file_path_str = str(att.get("path") or "").strip()
+        file_path = Path(file_path_str) if file_path_str else None
+        pdf_meta = _pdf_metadata(file_path) if (file_path and file_path.exists()) else {}
+        sidecar_rel = _extract_pdf_text_sidecar(file_path, quest_root) if (file_path and file_path.exists()) else None
+
+        pdf_preview_parts = [str(att.get("name") or "document.pdf")]
+        if pdf_meta.get("page_count"):
+            pdf_preview_parts.append(f"{pdf_meta['page_count']} pages")
+        if pdf_meta.get("size_bytes"):
+            kb = pdf_meta["size_bytes"] / 1024
+            pdf_preview_parts.append(f"{kb:.0f}KB" if kb < 1024 else f"{kb / 1024:.1f}MB")
+        if sidecar_rel:
+            pdf_preview_parts.append("text extracted")
+
+        evidence_id = f"E{base_index:03d}-pdf"
+        entry = {
+            "schema_version": EVIDENCE_SCHEMA_VERSION,
+            "evidence_id": evidence_id,
+            "run_id": message_id or evidence_id,
+            "event_id": None,
+            "tool_call_id": None,
+            "event_type": None,
+            "tool_name": "connector.qq.file",
+            "created_at": created_at,
+            "source_type": "connector_file",
+            "source_ref": {
+                "kind": "pdf",
+                "path": att.get("quest_relative_path") or str(att.get("path") or ""),
+                "line": None,
+                "url": str(att.get("url") or "").strip() or None,
+                "page": None,
+                "sidecar_path": str(sidecar_rel) if sidecar_rel else None,
+                "event_id": None,
+                "tool_call_id": None,
+            },
+            "args": {
+                "filename": str(att.get("name") or "").strip() or None,
+                "content_type": str(att.get("content_type") or "application/pdf").strip(),
+                "page_count": pdf_meta.get("page_count"),
+                "size_bytes": pdf_meta.get("size_bytes"),
+                "sha256": pdf_meta.get("sha256"),
+                "sender_id": sender_id,
+                "sender_name": sender_name,
+                "conversation_id": conversation_id,
+                "message_id": message_id,
+            },
+            "output_preview": " | ".join(pdf_preview_parts),
+            "summary": " | ".join(pdf_preview_parts),
+            "sidecar_path": str(sidecar_rel) if sidecar_rel else None,
+            "status": "ok" if (file_path and file_path.exists()) else "error",
+            "error": None if (file_path and file_path.exists()) else "pdf file not found on disk",
             "recorded_at": utc_now(),
         }
         entry["payload_sha256"] = _entry_payload_sha256(entry)

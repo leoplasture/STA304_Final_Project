@@ -924,6 +924,7 @@ class PromptBuilder:
             "- attachment_handling_rule: prefer readable sidecars such as extracted text, OCR text, or archive manifests when they exist; when no sidecar exists for an image, use the Read tool on raw_binary_path to inspect the visual content.",
             "- attachment_handling_rule_2: if the attachment belongs to a prior idea or experiment line, treat it as reference material rather than the active contract unless durable evidence promotes it.",
             "- attachment_handling_rule_3: for image attachments (content_type starting with image/), you MUST use the Read tool on the raw_binary_path to describe the image content (text, charts, data, layout). Do not skip this step.",
+            "- attachment_handling_rule_PDF: for PDF attachments (content_type=application/pdf), use bash_exec with PyPDF2 (import PyPDF2; reader = PyPDF2.PdfReader(path)) to extract and read the text content. Cite pages as [E00X-pdf p.3].",
         ]
         for index, item in enumerate(attachments[:6], start=1):
             preferred_read_path = (
@@ -935,9 +936,10 @@ class PromptBuilder:
             content_type = str(item.get("content_type") or item.get("mime_type") or "unknown").strip()
             binary_path = str(item.get("path") or "").strip() or "none"
             is_image = content_type.startswith("image/")
-            # Always show the binary path for image types so the Read tool can
-            # inspect them; hide non-image binaries that lack a text sidecar.
-            binary_hidden = (not is_image) and preferred_read_path == "none" and binary_path != "none"
+            is_pdf = content_type == "application/pdf" or (label or "").lower().endswith(".pdf")
+            # Always show the binary path for images and PDFs so tools can
+            # inspect them; hide other non-image binaries that lack a text sidecar.
+            binary_hidden = (not is_image) and (not is_pdf) and preferred_read_path == "none" and binary_path != "none"
             lines.append(
                 f"- attachment_{index}: label={label} | kind={kind} | content_type={content_type} | preferred_read_path={preferred_read_path} | raw_binary_path={'hidden' if binary_hidden else binary_path}"
             )
