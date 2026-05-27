@@ -56,3 +56,17 @@ dist.bak.*/
 # Local DeepScientist install helper
 /test_install_for_me.sh
 revised_final_project_openclaw_deepscientist.pdf
+
+# DeepScientist runtime home (logs, state, quests, temp)
+/DeepScientist/logs/
+/DeepScientist/runtime/
+/DeepScientist/config/
+/DeepScientist/quests/
+/DeepScientist/tmp/
+
+# Test artifacts
+/test_chart.png
+/test_paper.pdf
+/test_paper_with_contents.pdf
+/_start_daemon.py
+/src/ui/package-lock.json
