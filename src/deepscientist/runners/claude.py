@@ -206,7 +206,8 @@ class ClaudeRunner(SimpleCliRunner):
         resolved_runner_config = runner_config if isinstance(runner_config, dict) else self._load_runner_config()
         permission_mode = str(resolved_runner_config.get("permission_mode") or "bypassPermissions").strip() or "bypassPermissions"
         normalized_model = str(request.model or "").strip()
-        mcp_config_path = workspace_root / ".ds" / "claude-home" / "mcp.json"
+        claude_home = workspace_root / ".ds" / "claude-home"
+        mcp_config_path = claude_home / "mcp.json"
         custom_profile = resolve_mcp_tool_profile_for_quest(request.quest_root)
         server_names = builtin_mcp_server_names_for_custom_profile(custom_profile)
         command = [

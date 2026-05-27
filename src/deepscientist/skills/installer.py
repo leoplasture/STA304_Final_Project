@@ -24,10 +24,10 @@ class SkillInstaller:
         return discover_skill_bundles(self.repo_root)
 
     def sync_global(self) -> dict:
-        codex_root = ensure_dir(Path.home() / ".codex" / "skills")
-        claude_root = ensure_dir(Path.home() / ".claude" / "agents")
-        kimi_root = ensure_dir(Path.home() / ".kimi" / "skills")
-        opencode_root = ensure_dir(Path.home() / ".config" / "opencode" / "skills")
+        codex_root = ensure_dir(self.home / "runtime" / "codex-home" / "skills")
+        claude_root = ensure_dir(self.home / "runtime" / "claude-home" / "agents")
+        kimi_root = ensure_dir(self.home / "runtime" / "kimi-home" / "skills")
+        opencode_root = ensure_dir(self.home / "runtime" / "opencode-home" / "skills")
         copied_codex: list[str] = []
         copied_claude: list[str] = []
         copied_kimi: list[str] = []

@@ -158,6 +158,15 @@ class SimpleCliRunner:
         assert process.stderr is not None
         stderr_chunks: list[str] = []
 
+        # Write prompt immediately to prevent stdin timeout during setup
+        # (Claude CLI >=2.1.152 exits after ~3s if no stdin arrives)
+        try:
+            if self._command_uses_stdin_prompt():
+                process.stdin.write(prompt)
+                process.stdin.flush()
+        except (OSError, ValueError):
+            pass
+
         # Drain stderr concurrently so verbose CLIs cannot deadlock on a full
         # stderr pipe while the main loop is still reading stdout.
         def _drain_stderr() -> None:
@@ -176,7 +185,7 @@ class SimpleCliRunner:
         stderr_thread.start()
         try:
             if self._command_uses_stdin_prompt():
-                process.stdin.write(prompt)
+                process.stdin.write(prompt)  # second write for safety
             process.stdin.close()
 
             output_parts: list[str] = []
