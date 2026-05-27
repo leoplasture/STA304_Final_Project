@@ -239,6 +239,51 @@ def render_audit_markdown(audit: AuditResult, quest_root: Path | str | None = No
     return "\n".join(lines)
 
 
+def build_evidence_context_for_prompt(quest_root: Path | str) -> str:
+    """Build a prompt-ready evidence inventory block.
+
+    Called from the prompt builder so the model knows which evidence IDs
+    exist and can annotate claims with [E001] / [推断] / [待验证].
+    """
+    root = Path(quest_root)
+    try:
+        entries = query_events(root)
+    except Exception:
+        return ""
+
+    if not entries:
+        return ""
+
+    lines = [
+        "## Available Evidence Inventory",
+        "",
+        "When making factual claims from user-supplied materials, annotate them with",
+        "the matching Evidence ID. Use `[E001]` (or `[ev_E001]`) for text evidence,",
+        "`[E001-img]` for image evidence. Never fabricate evidence IDs.",
+        "",
+        "| Evidence ID | Source | Content Preview |",
+        "|-------------|--------|----------------|",
+    ]
+    for entry in entries:
+        eid = str(entry.get("evidence_id") or "").strip()
+        if not eid:
+            continue
+        source_label = _entry_source_label(entry)
+        preview = _entry_evidence_summary(entry)
+        lines.append(f"| `{eid}` | {source_label} | {preview} |")
+
+    lines.extend([
+        "",
+        "In your report, reference these IDs like:",
+        "- `[E001]` claim — directly supported by the cited evidence.",
+        "- `[推断]` claim — inferred from evidence but not directly measured.",
+        "- `[待验证]` claim — needs further experimental confirmation.",
+        "",
+        "Always include the Evidence Table section at the end of your report.",
+    ])
+    return "\n".join(lines)
+
+
 def build_evidence_table(report_text: str, quest_root: Path | str) -> str:
     """Build a Markdown evidence table from cited IDs in the report.
 
