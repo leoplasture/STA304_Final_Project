@@ -326,6 +326,7 @@ def test_pdf_attachment_generates_file_evidence(tmp_path: Path) -> None:
         pdf_path = tmp_path / "test.pdf"
         with open(pdf_path, "wb") as f:
             writer.write(f)
+        pdf_bytes = pdf_path.read_bytes()
     except ImportError:
         # Fallback minimal PDF
         pdf_bytes = (
