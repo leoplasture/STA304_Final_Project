@@ -98,11 +98,16 @@ def test_image_message_generates_image_evidence(tmp_path: Path) -> None:
 
     entries = record_connector_event(quest_root, message=message, materialized_attachments=materialized)
 
-    # Should be 1 image entry (no text entry since text is empty)
-    assert len(entries) == 1
-    entry = entries[0]
+    # Should have 1 text + 1 image entry (text placeholder for image-only messages)
+    assert len(entries) == 2
+    text_entry = entries[0]
+    assert text_entry["source_type"] == "connector_text"
+    assert text_entry["evidence_id"] == "E001"
+    assert text_entry["output_preview"] == "[image-only message; no text content]"
+
+    entry = entries[1]
     assert entry["source_type"] == "connector_image"
-    assert entry["evidence_id"].endswith("-img")
+    assert entry["evidence_id"] == "E001-img"
     assert entry["tool_name"] == "connector.qq.image"
     assert entry["status"] == "ok"
 

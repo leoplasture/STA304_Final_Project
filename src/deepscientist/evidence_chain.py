@@ -445,46 +445,47 @@ def record_connector_event(
     recorded: list[dict[str, Any]] = []
     base_index = next_index  # same message shares the same index
 
-    # Text entry
-    if text:
-        evidence_id = f"E{base_index:03d}"
-        entry = {
-            "schema_version": EVIDENCE_SCHEMA_VERSION,
-            "evidence_id": evidence_id,
-            "run_id": message_id or evidence_id,
+    # Text entry (always emit one, even for image-only messages, so that
+    # E00x text entries form a dense sequence with no gaps)
+    preview = _output_preview(text) if text else "[image-only message; no text content]"
+    evidence_id = f"E{base_index:03d}"
+    entry = {
+        "schema_version": EVIDENCE_SCHEMA_VERSION,
+        "evidence_id": evidence_id,
+        "run_id": message_id or evidence_id,
+        "event_id": None,
+        "tool_call_id": None,
+        "event_type": None,
+        "tool_name": "connector.qq",
+        "created_at": created_at,
+        "source_type": "connector_text",
+        "source_ref": {
+            "kind": "connector",
+            "path": f"qq:{conversation_id or ''}:{message_id or ''}",
+            "line": None,
+            "url": None,
+            "page": None,
+            "sidecar_path": None,
             "event_id": None,
             "tool_call_id": None,
-            "event_type": None,
-            "tool_name": "connector.qq",
-            "created_at": created_at,
-            "source_type": "connector_text",
-            "source_ref": {
-                "kind": "connector",
-                "path": f"qq:{conversation_id or ''}:{message_id or ''}",
-                "line": None,
-                "url": None,
-                "page": None,
-                "sidecar_path": None,
-                "event_id": None,
-                "tool_call_id": None,
-            },
-            "args": {
-                "text": _output_preview(text),
-                "sender_id": sender_id,
-                "sender_name": sender_name,
-                "conversation_id": conversation_id,
-                "message_id": message_id,
-            },
-            "output_preview": _output_preview(text),
-            "summary": _output_preview(text),
-            "sidecar_path": None,
-            "status": "ok",
-            "error": None,
-            "recorded_at": utc_now(),
-        }
-        entry["payload_sha256"] = _entry_payload_sha256(entry)
-        entries.append(entry)
-        recorded.append(entry)
+        },
+        "args": {
+            "text": _output_preview(text) if text else "",
+            "sender_id": sender_id,
+            "sender_name": sender_name,
+            "conversation_id": conversation_id,
+            "message_id": message_id,
+        },
+        "output_preview": preview,
+        "summary": preview,
+        "sidecar_path": None,
+        "status": "ok",
+        "error": None,
+        "recorded_at": utc_now(),
+    }
+    entry["payload_sha256"] = _entry_payload_sha256(entry)
+    entries.append(entry)
+    recorded.append(entry)
 
     # Image entries
     for att in (materialized_attachments or []):
