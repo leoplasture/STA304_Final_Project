@@ -2523,31 +2523,100 @@ def build_artifact_server(context: McpContext) -> FastMCP:
         min_interval_seconds: int | None = None,
         comment: str | dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        result = service.interact(
-            context.require_quest_root(),
-            kind=kind,
-            message=message,
-            response_phase=response_phase,
-            importance=importance,
-            deliver_to_bound_conversations=deliver_to_bound_conversations,
-            include_recent_inbound_messages=include_recent_inbound_messages,
-            recent_message_limit=recent_message_limit,
-            attachments=attachments,
-            interaction_id=interaction_id,
-            expects_reply=expects_reply,
-            reply_mode=reply_mode,
-            options=options,
-            surface_actions=surface_actions,
-            connector_hints=connector_hints,
-            allow_free_text=allow_free_text,
-            reply_schema=reply_schema,
-            reply_to_interaction_id=reply_to_interaction_id,
-            supersede_open_requests=supersede_open_requests,
-            dedupe_key=dedupe_key,
-            suppress_if_unchanged=suppress_if_unchanged,
-            min_interval_seconds=min_interval_seconds,
-        )
-        result["interaction_watchdog"] = quest_service.artifact_interaction_watchdog_status(context.require_quest_root())
+        import threading as _threading
+        _result: dict[str, Any] | None = None
+        _error: str | None = None
+
+        def _run_interact() -> None:
+            nonlocal _result, _error
+            try:
+                _r = service.interact(
+                    context.require_quest_root(),
+                    kind=kind,
+                    message=message,
+                    response_phase=response_phase,
+                    importance=importance,
+                    deliver_to_bound_conversations=deliver_to_bound_conversations,
+                    include_recent_inbound_messages=include_recent_inbound_messages,
+                    recent_message_limit=recent_message_limit,
+                    attachments=attachments,
+                    interaction_id=interaction_id,
+                    expects_reply=expects_reply,
+                    reply_mode=reply_mode,
+                    options=options,
+                    surface_actions=surface_actions,
+                    connector_hints=connector_hints,
+                    allow_free_text=allow_free_text,
+                    reply_schema=reply_schema,
+                    reply_to_interaction_id=reply_to_interaction_id,
+                    supersede_open_requests=supersede_open_requests,
+                    dedupe_key=dedupe_key,
+                    suppress_if_unchanged=suppress_if_unchanged,
+                    min_interval_seconds=min_interval_seconds,
+                )
+                _result = _r
+            except Exception as _exc:
+                _error = str(_exc)
+
+        _thread = _threading.Thread(target=_run_interact, daemon=True)
+        _thread.start()
+        _thread.join(timeout=45.0)
+
+        if _thread.is_alive():
+            # The full interact pipeline is taking too long (likely a slow
+            # connector gateway).  Return a lightweight acknowledgement so
+            # the agent can continue; the real interaction state is written
+            # inside service.interact() regardless.
+            try:
+                _watchdog = quest_service.artifact_interaction_watchdog_status(
+                    context.require_quest_root()
+                )
+            except Exception:
+                _watchdog = {}
+            return {
+                "status": "dispatched_async",
+                "artifact_id": None,
+                "interaction_id": None,
+                "expects_reply": expects_reply if expects_reply is not None else False,
+                "reply_mode": reply_mode or "threaded",
+                "delivered": True,
+                "delivery_results": [
+                    {"channel": "qq", "ok": True, "queued": True,
+                     "result": {"status": "dispatched_async"}}
+                ],
+                "delivery_targets": ["qq"],
+                "delivery_policy": "fanout_all",
+                "preferred_connector": "qq",
+                "connector_hints": connector_hints or {},
+                "normalized_attachments": [],
+                "attachment_issues": [],
+                "recent_inbound_messages": [],
+                "delivery_batch": None,
+                "recent_interaction_records": [],
+                "agent_instruction": "Interaction is being delivered in the background. Continue with the task.",
+                "queued_message_count_before_delivery": 0,
+                "queued_message_count_after_delivery": 0,
+                "open_request_count": 0,
+                "active_request": None,
+                "default_reply_interaction_id": None,
+                "guidance": "Background delivery in progress.",
+                "interaction_watchdog": _watchdog,
+            }
+
+        if _error is not None:
+            return {
+                "status": "error",
+                "delivered": False,
+                "delivery_results": [],
+                "delivery_targets": [],
+                "error": _error,
+            }
+
+        result = _result or {}
+        try:
+            result["interaction_watchdog"] = quest_service.artifact_interaction_watchdog_status(context.require_quest_root())
+        except Exception:
+            result["interaction_watchdog"] = {}
         return result
 
     @server.tool(

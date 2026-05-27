@@ -15718,7 +15718,6 @@ class ArtifactService:
             })
         try:
             channel = factory(home=self.home, config=channel_config)
-            result = channel.send(payload)
         except Exception as exc:
             return finish({
                 "ok": False,
@@ -15728,6 +15727,48 @@ class ArtifactService:
                 "delivery": None,
                 "error": str(exc),
             })
+        # Run channel.send() in a daemon thread with a timeout so that slow
+        # connector gateways (e.g. QQ WebSocket) cannot block the MCP server
+        # stdio pipe and cause "Connection closed" errors downstream.
+        _send_result: dict[str, Any] | None = None
+        _send_error: str | None = None
+
+        def _do_send() -> None:
+            nonlocal _send_result, _send_error
+            try:
+                _send_result = channel.send(payload)
+            except Exception as exc:
+                _send_error = str(exc)
+
+        _thread = threading.Thread(target=_do_send, daemon=True)
+        _thread.start()
+        _thread.join(timeout=15.0)
+
+        if _thread.is_alive():
+            # Delivery is still in-flight; return a queued acknowledgement
+            # so interact does not block. The thread will complete in the
+            # background and the connector outbound event will be recorded
+            # via the normal outbound log path inside channel.send().
+            return finish({
+                "ok": True,
+                "queued": True,
+                "channel": channel_name,
+                "payload": payload,
+                "delivery": {"ok": True, "queued": True},
+                "result": {"status": "dispatched_async"},
+            })
+
+        if _send_error is not None:
+            return finish({
+                "ok": False,
+                "queued": False,
+                "channel": channel_name,
+                "payload": payload,
+                "delivery": None,
+                "error": _send_error,
+            })
+
+        result = _send_result or {}
         delivery = result.get("delivery") if isinstance(result.get("delivery"), dict) else None
         ok = bool(delivery.get("ok", False)) if delivery is not None else bool(result.get("ok", False))
         queued = bool(delivery.get("queued", False)) if delivery is not None else bool(result.get("queued", False))
