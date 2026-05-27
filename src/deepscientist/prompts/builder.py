@@ -921,9 +921,9 @@ class PromptBuilder:
 
         lines = [
             f"- attachment_count: {len(attachments)}",
-            "- attachment_handling_rule: prefer readable sidecars such as extracted text, OCR text, or archive manifests when they exist; use raw binaries only when the readable sidecar is insufficient.",
+            "- attachment_handling_rule: prefer readable sidecars such as extracted text, OCR text, or archive manifests when they exist; when no sidecar exists for an image, use the Read tool on raw_binary_path to inspect the visual content.",
             "- attachment_handling_rule_2: if the attachment belongs to a prior idea or experiment line, treat it as reference material rather than the active contract unless durable evidence promotes it.",
-            "- attachment_handling_rule_3: do not assume raw image/video/audio binaries can be injected directly into the runner prompt; when no readable sidecar exists, treat the binary as non-inline reference material.",
+            "- attachment_handling_rule_3: for image attachments (content_type starting with image/), you MUST use the Read tool on the raw_binary_path to describe the image content (text, charts, data, layout). Do not skip this step.",
         ]
         for index, item in enumerate(attachments[:6], start=1):
             preferred_read_path = (
@@ -934,7 +934,10 @@ class PromptBuilder:
             kind = str(item.get("kind") or "attachment").strip()
             content_type = str(item.get("content_type") or item.get("mime_type") or "unknown").strip()
             binary_path = str(item.get("path") or "").strip() or "none"
-            binary_hidden = preferred_read_path == "none" and binary_path != "none"
+            is_image = content_type.startswith("image/")
+            # Always show the binary path for image types so the Read tool can
+            # inspect them; hide non-image binaries that lack a text sidecar.
+            binary_hidden = (not is_image) and preferred_read_path == "none" and binary_path != "none"
             lines.append(
                 f"- attachment_{index}: label={label} | kind={kind} | content_type={content_type} | preferred_read_path={preferred_read_path} | raw_binary_path={'hidden' if binary_hidden else binary_path}"
             )
