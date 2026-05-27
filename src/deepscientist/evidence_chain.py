@@ -445,9 +445,13 @@ def record_connector_event(
     recorded: list[dict[str, Any]] = []
     base_index = next_index  # same message shares the same index
 
-    # Text entry
-    if text:
+    # Text entry — record even if text is empty when attachments are present
+    has_attachments = bool(materialized_attachments)
+    if text or has_attachments:
         evidence_id = f"E{base_index:03d}"
+        source_type = "connector_text" if text else "connector_attachment"
+        tool_name = "connector.qq"
+        preview = _output_preview(text) if text else f"(attachment-only message, {len(materialized_attachments)} file(s))"
         entry = {
             "schema_version": EVIDENCE_SCHEMA_VERSION,
             "evidence_id": evidence_id,
@@ -455,9 +459,9 @@ def record_connector_event(
             "event_id": None,
             "tool_call_id": None,
             "event_type": None,
-            "tool_name": "connector.qq",
+            "tool_name": tool_name,
             "created_at": created_at,
-            "source_type": "connector_text",
+            "source_type": source_type,
             "source_ref": {
                 "kind": "connector",
                 "path": f"qq:{conversation_id or ''}:{message_id or ''}",
@@ -475,8 +479,8 @@ def record_connector_event(
                 "conversation_id": conversation_id,
                 "message_id": message_id,
             },
-            "output_preview": _output_preview(text),
-            "summary": _output_preview(text),
+            "output_preview": preview,
+            "summary": preview,
             "sidecar_path": None,
             "status": "ok",
             "error": None,
@@ -550,6 +554,75 @@ def record_connector_event(
         entries.append(entry)
         recorded.append(entry)
 
+    # File attachment entries (PDF, txt, etc.)
+    img_index = 0
+    for att in (materialized_attachments or []):
+        if not isinstance(att, dict):
+            continue
+        content_type = str(att.get("content_type") or "").strip().lower()
+        is_image = content_type.startswith("image/") or bool(
+            att.get("url") and any(
+                str(att.get("url") or "").lower().endswith(ext)
+                for ext in (".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp")
+            )
+        )
+        if is_image:
+            img_index += 1
+            continue
+
+        file_path_str = str(att.get("path") or "").strip()
+        file_path = Path(file_path_str) if file_path_str else None
+        file_name = str(att.get("name") or "file")
+        file_size = att.get("size_bytes")
+        if file_path and file_path.exists():
+            try:
+                file_size = file_path.stat().st_size
+            except Exception:
+                pass
+
+        img_index += 1
+        evidence_id = f"E{base_index:03d}-file{img_index}"
+        entry = {
+            "schema_version": EVIDENCE_SCHEMA_VERSION,
+            "evidence_id": evidence_id,
+            "run_id": message_id or evidence_id,
+            "event_id": None,
+            "tool_call_id": None,
+            "event_type": None,
+            "tool_name": "connector.qq.file",
+            "created_at": created_at,
+            "source_type": "connector_file",
+            "source_ref": {
+                "kind": "connector_file",
+                "path": att.get("quest_relative_path") or str(att.get("path") or ""),
+                "line": None,
+                "url": str(att.get("url") or "").strip() or None,
+                "page": None,
+                "sidecar_path": None,
+                "event_id": None,
+                "tool_call_id": None,
+            },
+            "args": {
+                "original_url": str(att.get("url") or "").strip() or None,
+                "content_type": str(att.get("content_type") or "").strip() or None,
+                "filename": file_name,
+                "size_bytes": file_size,
+                "sender_id": sender_id,
+                "sender_name": sender_name,
+                "conversation_id": conversation_id,
+                "message_id": message_id,
+            },
+            "output_preview": _format_file_preview(file_name, content_type, file_size),
+            "summary": _format_file_preview(file_name, content_type, file_size),
+            "sidecar_path": None,
+            "status": "ok" if (file_path and file_path.exists()) else "error",
+            "error": None if (file_path and file_path.exists()) else "file not found on disk",
+            "recorded_at": utc_now(),
+        }
+        entry["payload_sha256"] = _entry_payload_sha256(entry)
+        entries.append(entry)
+        recorded.append(entry)
+
     if recorded:
         store["entries"] = _reindex_entries(entries)
         store["generated_at"] = str(store.get("generated_at") or utc_now())
@@ -572,6 +645,19 @@ def _format_image_preview(att: dict[str, Any], img_meta: dict[str, Any]) -> str:
     if size:
         try:
             kb = int(size) / 1024
+            parts.append(f"{kb:.1f}KB" if kb < 1024 else f"{kb / 1024:.1f}MB")
+        except Exception:
+            pass
+    return " | ".join(parts)
+
+
+def _format_file_preview(name: str, content_type: str, size_bytes: Any) -> str:
+    parts = [f"file: {name}"]
+    if content_type:
+        parts.append(content_type)
+    if size_bytes:
+        try:
+            kb = int(size_bytes) / 1024
             parts.append(f"{kb:.1f}KB" if kb < 1024 else f"{kb / 1024:.1f}MB")
         except Exception:
             pass
