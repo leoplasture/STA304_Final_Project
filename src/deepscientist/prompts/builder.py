@@ -2085,6 +2085,17 @@ class PromptBuilder:
             lines.append(
                 "- paper_story_rule: write the paper around one defensible idea and what the reader learns from the results, not around the order in which the agent ran experiments."
             )
+        # --- Evidence chain context ---
+        try:
+            from ..evidence_audit import build_evidence_context_for_prompt
+
+            evidence_ctx = build_evidence_context_for_prompt(quest_root)
+            if evidence_ctx:
+                lines.append("")
+                lines.append(evidence_ctx)
+        except Exception:
+            pass
+
         return "\n".join(lines)
 
     def _priority_memory_block(
