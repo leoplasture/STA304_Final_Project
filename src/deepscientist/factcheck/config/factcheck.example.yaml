@@ -1,0 +1,26 @@
+# Non-sensitive defaults for factcheck module.
+# Real API keys must be injected via environment variables.
+
+http:
+  timeout_seconds: 15
+  max_retries: 2
+  retry_backoff_seconds: 1.0
+
+rate_limit:
+  semantic_scholar_qps: 3
+  crossref_qps: 3
+  arxiv_qps: 3
+
+providers:
+  semantic_scholar:
+    enabled: true
+    api_key_env: "SEMANTIC_SCHOLAR_API_KEY"
+  crossref:
+    enabled: true
+  arxiv:
+    enabled: true
+
+verification:
+  default_evidence_level: "abstract_only"
+  prefer_full_text_if_open_access: true
+
