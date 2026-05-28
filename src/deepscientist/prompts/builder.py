@@ -193,7 +193,7 @@ class PromptBuilder:
             built_in_namespaces = "artifact, bash_exec"
             mcp_namespace_note = "mcp_namespace_note: only `artifact.prepare_start_setup_form(...)` and `bash_exec(...)` are available in this session."
         else:
-            built_in_namespaces = "memory, artifact, bash_exec"
+            built_in_namespaces = "memory, artifact, bash_exec, factcheck"
             mcp_namespace_note = "mcp_namespace_note: use `bash_exec(...)` for all CLI commands."
         runner_tool_name_note = ""
         normalized_runner_name = str(runner_name or "").strip().lower()

@@ -2641,6 +2641,88 @@ def build_artifact_server(context: McpContext) -> FastMCP:
     return server
 
 
+def build_factcheck_server(context: McpContext) -> FastMCP:
+    """Build the factcheck MCP namespace — literature citation verification tools.
+
+    Requires deepscientist.factcheck (Project A — Persons A/B/C).
+    """
+    server = FastMCP(
+        "factcheck",
+        instructions=(
+            "FactCheck namespace for literature citation verification. "
+            "Use parse_pdf to extract claims from a PDF or text report, "
+            "then verify_claim to check each claim against the cited paper. "
+            "Verification searches Semantic Scholar → arXiv → Crossref."
+        ),
+        log_level="ERROR",
+    )
+
+    @server.tool(
+        name="parse_pdf",
+        description=(
+            "Extract structured factual claims from a PDF or plain-text report. "
+            "Each claim includes the claim text, citation markers, and resolved paper titles. "
+            "Use this first — then call verify_claim for each claim."
+        ),
+    )
+    def parse_pdf(pdf_path: str) -> list[dict[str, Any]]:
+        quest_root = context.quest_root or context.require_quest_root()
+        try:
+            from deepscientist.factcheck.claim_extractor import parse_pdf as _parse
+        except ImportError:
+            return [{"error": "factcheck module not available — Person A code not deployed"}]
+        claims = _parse(str(pdf_path))
+        return [
+            {
+                "claim_id": c.claim_id,
+                "claim_text": c.claim_text,
+                "citation_markers": c.citation_markers,
+                "cited_paper_title": c.cited_paper_title,
+            }
+            for c in claims
+        ]
+
+    @server.tool(
+        name="verify_claim",
+        description=(
+            "Verify whether a factual claim is supported by its cited paper. "
+            "Searches Semantic Scholar → arXiv → Crossref for the paper, "
+            "then checks whether the claim text is supported, contradicted, or not found. "
+            "Returns a verdict with confidence score and evidence snippet."
+        ),
+    )
+    def verify_claim(
+        claim_text: str,
+        cited_paper_title: str,
+    ) -> dict[str, Any]:
+        try:
+            from deepscientist.factcheck.semantic_verifier import verify_claim as _verify
+        except ImportError:
+            return {
+                "claim_id": "",
+                "claim_text": claim_text,
+                "cited_paper": cited_paper_title,
+                "verdict": "not_found",
+                "evidence_level": "abstract_only",
+                "evidence_snippet": "",
+                "confidence": 0.0,
+                "notes": "factcheck module not available — Person A code not deployed",
+            }
+        result = _verify(claim_text, cited_paper_title)
+        return {
+            "claim_id": result.claim_id,
+            "claim_text": result.claim_text,
+            "cited_paper": result.cited_paper,
+            "verdict": result.verdict,
+            "evidence_level": result.evidence_level,
+            "evidence_snippet": result.evidence_snippet,
+            "confidence": result.confidence,
+            "notes": result.notes,
+        }
+
+    return server
+
+
 def build_bash_exec_server(context: McpContext) -> FastMCP:
     service = BashExecService(context.home)
     quest_service = QuestService(context.home)
@@ -2969,13 +3051,19 @@ def _ensure_utf8_stdio() -> None:
 def main() -> int:
     _ensure_utf8_stdio()
     parser = argparse.ArgumentParser(description="DeepScientist built-in MCP server")
-    parser.add_argument("--namespace", choices=("memory", "artifact", "bash_exec"), required=True)
+    parser.add_argument(
+        "--namespace",
+        choices=("memory", "artifact", "bash_exec", "factcheck"),
+        required=True,
+    )
     args = parser.parse_args()
     context = McpContext.from_env()
     if args.namespace == "memory":
         build_memory_server(context).run("stdio")
     elif args.namespace == "artifact":
         build_artifact_server(context).run("stdio")
+    elif args.namespace == "factcheck":
+        build_factcheck_server(context).run("stdio")
     else:
         build_bash_exec_server(context).run("stdio")
     return 0

@@ -86,6 +86,7 @@ def build_session_descriptor(
             {"name": "memory", "transport": "stdio", "scope": "quest-local"},
             {"name": "artifact", "transport": "stdio", "scope": "quest-local"},
             {"name": "bash_exec", "transport": "stdio", "scope": "quest-local"},
+            {"name": "factcheck", "transport": "stdio", "scope": "quest-local"},
         ],
         "slash_commands": build_slash_commands(quest_id),
         "meta": {

@@ -9,7 +9,7 @@ from typing import Any
 from ..shared import read_yaml
 
 
-DEFAULT_BUILTIN_MCP_SERVER_NAMES: tuple[str, ...] = ("memory", "artifact", "bash_exec")
+DEFAULT_BUILTIN_MCP_SERVER_NAMES: tuple[str, ...] = ("memory", "artifact", "bash_exec", "factcheck")
 SETTINGS_ISSUE_CUSTOM_PROFILE = "settings_issue"
 START_SETUP_PREPARE_PROFILE = "start_setup_prepare"
 _START_SETUP_PATCH_BLOCK_RE = re.compile(r"```start_setup_patch\s*([\s\S]*?)```", re.IGNORECASE)
