@@ -2642,9 +2642,9 @@ def build_artifact_server(context: McpContext) -> FastMCP:
 
 
 def build_factcheck_server(context: McpContext) -> FastMCP:
-    """Build the factcheck MCP namespace — literature citation verification tools.
+    """Build the factcheck MCP namespace for literature citation verification tools.
 
-    Requires deepscientist.factcheck (Project A — Persons A/B/C).
+    Requires deepscientist.factcheck (Project A Persons A/B/C).
     """
     server = FastMCP(
         "factcheck",
@@ -2652,7 +2652,7 @@ def build_factcheck_server(context: McpContext) -> FastMCP:
             "FactCheck namespace for literature citation verification. "
             "Use parse_pdf to extract claims from a PDF or text report, "
             "then verify_claim to check each claim against the cited paper. "
-            "Verification searches Semantic Scholar → arXiv → Crossref."
+            "Verification searches Semantic Scholar -> arXiv -> Crossref."
         ),
         log_level="ERROR",
     )
@@ -2662,16 +2662,26 @@ def build_factcheck_server(context: McpContext) -> FastMCP:
         description=(
             "Extract structured factual claims from a PDF or plain-text report. "
             "Each claim includes the claim text, citation markers, and resolved paper titles. "
-            "Use this first — then call verify_claim for each claim."
+            "Use this first, then call verify_claim for each claim."
         ),
     )
     def parse_pdf(pdf_path: str) -> list[dict[str, Any]]:
         quest_root = context.quest_root or context.require_quest_root()
         try:
             from deepscientist.factcheck.claim_extractor import parse_pdf as _parse
+            from deepscientist.factcheck.claim_extractor import PDFExtractionError
         except ImportError:
-            return [{"error": "factcheck module not available — Person A code not deployed"}]
-        claims = _parse(str(pdf_path))
+            return [{"error": "factcheck module not available; Person A code not deployed"}]
+        try:
+            claims = _parse(str(pdf_path))
+        except PDFExtractionError:
+            return [
+                {
+                    "ok": False,
+                    "error": "PDF text extraction failed",
+                    "fallback_recommended": True,
+                }
+            ]
         return [
             {
                 "claim_id": c.claim_id,
@@ -2686,7 +2696,7 @@ def build_factcheck_server(context: McpContext) -> FastMCP:
         name="verify_claim",
         description=(
             "Verify whether a factual claim is supported by its cited paper. "
-            "Searches Semantic Scholar → arXiv → Crossref for the paper, "
+            "Searches Semantic Scholar -> arXiv -> Crossref for the paper, "
             "then checks whether the claim text is supported, contradicted, or not found. "
             "Returns a verdict with confidence score and evidence snippet."
         ),
@@ -2694,23 +2704,25 @@ def build_factcheck_server(context: McpContext) -> FastMCP:
     def verify_claim(
         claim_text: str,
         cited_paper_title: str,
+        claim_id: str = "",
     ) -> dict[str, Any]:
         try:
             from deepscientist.factcheck.semantic_verifier import verify_claim as _verify
         except ImportError:
             return {
-                "claim_id": "",
+                "claim_id": claim_id or "",
                 "claim_text": claim_text,
                 "cited_paper": cited_paper_title,
                 "verdict": "not_found",
                 "evidence_level": "abstract_only",
                 "evidence_snippet": "",
                 "confidence": 0.0,
-                "notes": "factcheck module not available — Person A code not deployed",
+                "notes": "factcheck module not available; Person A code not deployed",
             }
         result = _verify(claim_text, cited_paper_title)
+        resolved_claim_id = claim_id if claim_id else result.claim_id
         return {
-            "claim_id": result.claim_id,
+            "claim_id": resolved_claim_id,
             "claim_text": result.claim_text,
             "cited_paper": result.cited_paper,
             "verdict": result.verdict,

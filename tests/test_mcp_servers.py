@@ -8,13 +8,14 @@ from pathlib import Path
 import pytest
 
 from deepscientist.artifact import ArtifactService
+from deepscientist.factcheck import VerificationResult
 from deepscientist.bash_exec import BashExecService
 from deepscientist.config import ConfigManager
 from deepscientist.daemon.app import DaemonApp
 from deepscientist.home import ensure_home_layout, repo_root
 from deepscientist.memory import MemoryService
 from deepscientist.mcp.context import McpContext
-from deepscientist.mcp.server import build_artifact_server, build_bash_exec_server, build_memory_server
+from deepscientist.mcp.server import build_artifact_server, build_bash_exec_server, build_factcheck_server, build_memory_server
 from deepscientist.quest import QuestService
 from deepscientist.shared import read_json, read_jsonl, write_json, write_yaml
 from deepscientist.skills import SkillInstaller
@@ -84,6 +85,95 @@ def test_artifact_mcp_server_confirm_baseline_schema_exposes_structured_metric_c
         assert '"source_ref"' in schema_text
         assert '"derivation"' in schema_text
         assert '"description"' in schema_text
+
+    asyncio.run(scenario())
+
+
+def test_factcheck_mcp_verify_claim_supports_claim_id_passthrough(
+    temp_home: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def scenario() -> None:
+        ensure_home_layout(temp_home)
+        ConfigManager(temp_home).ensure_files()
+        quest = QuestService(temp_home, skill_installer=SkillInstaller(repo_root(), temp_home)).create("mcp factcheck quest")
+        context = McpContext(
+            home=temp_home,
+            quest_id=quest["quest_id"],
+            quest_root=Path(quest["quest_root"]),
+            run_id="run-mcp-factcheck",
+            active_anchor="crossdisc_idea",
+            conversation_id="quest:test-factcheck",
+            agent_role="idea",
+            worker_id="worker-main",
+            worktree_root=None,
+            team_mode="single",
+        )
+        server = build_factcheck_server(context)
+
+        def fake_verify(_claim_text: str, _title: str) -> VerificationResult:
+            return VerificationResult(
+                claim_id="",
+                claim_text="test claim",
+                cited_paper="test paper",
+                verdict="supported",
+                evidence_level="abstract_only",
+                evidence_snippet="snippet",
+                confidence=0.9,
+                notes="",
+            )
+
+        monkeypatch.setattr("deepscientist.factcheck.semantic_verifier.verify_claim", fake_verify)
+        result = _unwrap_tool_result(
+            await server.call_tool(
+                "verify_claim",
+                {
+                    "claim_text": "test claim",
+                    "cited_paper_title": "test paper",
+                    "claim_id": "C123",
+                },
+            )
+        )
+        assert result["claim_id"] == "C123"
+        assert result["verdict"] == "supported"
+
+    asyncio.run(scenario())
+
+
+def test_factcheck_mcp_parse_pdf_returns_fallback_error_on_extraction_failure(
+    temp_home: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def scenario() -> None:
+        ensure_home_layout(temp_home)
+        ConfigManager(temp_home).ensure_files()
+        quest = QuestService(temp_home, skill_installer=SkillInstaller(repo_root(), temp_home)).create("mcp factcheck parser quest")
+        context = McpContext(
+            home=temp_home,
+            quest_id=quest["quest_id"],
+            quest_root=Path(quest["quest_root"]),
+            run_id="run-mcp-factcheck-parser",
+            active_anchor="crossdisc_idea",
+            conversation_id="quest:test-factcheck-parser",
+            agent_role="idea",
+            worker_id="worker-main",
+            worktree_root=None,
+            team_mode="single",
+        )
+        server = build_factcheck_server(context)
+
+        from deepscientist.factcheck.claim_extractor import PDFExtractionError
+
+        def fake_parse(_pdf_path: str):
+            raise PDFExtractionError("PDF text extraction failed")
+
+        monkeypatch.setattr("deepscientist.factcheck.claim_extractor.parse_pdf", fake_parse)
+        result = _unwrap_tool_result(await server.call_tool("parse_pdf", {"pdf_path": "bad.pdf"}))
+        payload = result.get("result") if isinstance(result, dict) and "result" in result else result
+        assert isinstance(payload, list)
+        assert payload[0]["ok"] is False
+        assert payload[0]["error"] == "PDF text extraction failed"
+        assert payload[0]["fallback_recommended"] is True
 
     asyncio.run(scenario())
 

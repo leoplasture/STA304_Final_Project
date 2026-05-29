@@ -275,6 +275,18 @@ class PromptBuilder:
                     connector_contract_block,
                 ]
             )
+        if skill_id == "crossdisc_idea":
+            sections.extend(
+                [
+                    "",
+                    "## FactCheck Execution Contract",
+                    "- MUST map claim ids before scoring: `vr.claim_id = claim.claim_id` for every parsed claim.",
+                    "- MUST call `score_batch(results, ...)` and MUST NOT compute PASS/WARN/FAIL manually.",
+                    "- MUST call `render_factcheck_markdown(batch)` and MUST NOT hand-write the factcheck table.",
+                    "- MUST call `mcp__artifact__record(...)` to persist the final report into evidence store before final delivery.",
+                    "- If `parse_pdf` returns `{ok:false, fallback_recommended:true}`, switch to extraction fallback and keep parser failure noted in report.",
+                ]
+            )
         sections.extend(
             [
                 "",

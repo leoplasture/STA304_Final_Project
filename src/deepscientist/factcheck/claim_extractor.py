@@ -5,6 +5,12 @@ from pathlib import Path
 
 from . import Claim
 
+MAX_EXTRACTED_CHARS = 200_000
+MAX_RETURNED_CLAIMS = 40
+MIN_READABLE_RATIO = 0.45
+
+_CONTROL_CHARS_PATTERN = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]")
+_PDF_OPERATOR_PATTERN = re.compile(r"\b(?:BT|ET|Tf|Tm|Td|Tj|TJ|rg|RG|cm|q|Q|Do|re|m|l|S|f|B)\b")
 _CITATION_BLOCK_PATTERN = re.compile(r"\[([^\[\]]+)\]")
 _SENTENCE_SPLIT_PATTERN = re.compile(r"(?<=[\.\!\?。！？])(?:\s+|\n+)")
 _ABBREV_PATTERN = re.compile(r"\b(?:et al|i\.e|e\.g|vs|fig|Fig|Eq|eq|Dr|Prof|Mr|Ms)\.", flags=re.IGNORECASE)
@@ -13,6 +19,33 @@ _REFERENCE_HEADING_PATTERN = re.compile(
     r"^(references|bibliography|参考文献)\s*$",
     flags=re.IGNORECASE | re.MULTILINE,
 )
+
+
+class PDFExtractionError(ValueError):
+    """Raised when PDF text extraction produces unreadable content."""
+
+
+def _clean_extracted_text(text: str) -> str:
+    text = _CONTROL_CHARS_PATTERN.sub(" ", text)
+    text = _PDF_OPERATOR_PATTERN.sub(" ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    if len(text) > MAX_EXTRACTED_CHARS:
+        text = text[:MAX_EXTRACTED_CHARS]
+    return text
+
+
+def _readability_ratio(text: str) -> float:
+    if not text:
+        return 0.0
+    readable = sum(ch.isalnum() or ch.isspace() or ch in ".,;:!?-_/()[]'\"" for ch in text)
+    return readable / max(1, len(text))
+
+
+def _validate_readability(text: str) -> None:
+    if not text:
+        raise PDFExtractionError("PDF text extraction failed")
+    if _readability_ratio(text) < MIN_READABLE_RATIO:
+        raise PDFExtractionError("PDF text extraction failed")
 
 
 def _read_pdf_like_text(path: Path) -> str:
@@ -33,7 +66,9 @@ def _read_pdf_like_text(path: Path) -> str:
             if text:
                 pages.append(text)
         if pages:
-            return "\n".join(pages)
+            cleaned = _clean_extracted_text("\n".join(pages))
+            _validate_readability(cleaned)
+            return cleaned
     except Exception:
         pass
 
@@ -50,7 +85,10 @@ def _read_pdf_like_text(path: Path) -> str:
         cleaned = re.sub(r"[^A-Za-z0-9\[\]\(\)\-_,.;:!?/\s]", " ", line).strip()
         if len(cleaned) >= 20:
             lines.append(cleaned)
-    return "\n".join(lines)
+
+    cleaned = _clean_extracted_text("\n".join(lines))
+    _validate_readability(cleaned)
+    return cleaned
 
 
 def _split_main_and_references(text: str) -> tuple[str, str]:
@@ -130,6 +168,8 @@ def parse_pdf(pdf_path: str) -> list[Claim]:
     claims: list[Claim] = []
     claim_index = 1
     for sentence in _split_sentences(main_text):
+        if len(claims) >= MAX_RETURNED_CLAIMS:
+            break
         sentence = sentence.strip()
         if not sentence or not _looks_like_claim(sentence):
             continue

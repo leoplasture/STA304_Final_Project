@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from deepscientist.factcheck.claim_extractor import parse_pdf
+from deepscientist.factcheck.claim_extractor import PDFExtractionError, parse_pdf
 from deepscientist.factcheck.semantic_verifier import verify_claim
 
 
@@ -74,3 +74,32 @@ def test_verify_claim_not_found(monkeypatch) -> None:
     result = verify_claim("A claim without evidence.", "Unknown paper")
     assert result.verdict == "not_found"
     assert result.confidence == 0.0
+
+
+def test_parse_pdf_caps_returned_claims(tmp_path: Path) -> None:
+    refs = "\n".join(f"[R{i}] Title {i}" for i in range(1, 80))
+    body = "\n".join(
+        f"Method improves metric by {i}% [R{i}]." for i in range(1, 80)
+    )
+    path = tmp_path / "many_claims.txt"
+    path.write_text(f"{body}\n\nReferences\n{refs}\n", encoding="utf-8")
+
+    claims = parse_pdf(str(path))
+    assert len(claims) == 40
+    assert claims[0].claim_id == "C001"
+    assert claims[-1].claim_id == "C040"
+
+
+def test_parse_pdf_raises_on_unreadable_pdf(monkeypatch, tmp_path: Path) -> None:
+    pdf = tmp_path / "bad.pdf"
+    pdf.write_bytes(b"%PDF-1.4 garbage")
+
+    def _fail_read(_path: Path) -> str:
+        raise PDFExtractionError("PDF text extraction failed")
+
+    monkeypatch.setattr("deepscientist.factcheck.claim_extractor._read_pdf_like_text", _fail_read)
+    try:
+        parse_pdf(str(pdf))
+        raise AssertionError("Expected PDFExtractionError")
+    except PDFExtractionError:
+        pass

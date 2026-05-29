@@ -90,6 +90,22 @@ def test_prompt_builder_includes_layered_runtime_context(temp_home: Path) -> Non
     assert len(prompt) < 125000
 
 
+def test_prompt_builder_injects_factcheck_execution_contract_for_crossdisc_idea(temp_home: Path) -> None:
+    builder, snapshot = _make_builder(temp_home)
+    prompt = builder.build(
+        quest_id=snapshot["quest_id"],
+        skill_id="crossdisc_idea",
+        user_message="Run cross-discipline factcheck flow.",
+        model="gpt-5.4",
+    )
+
+    assert "## FactCheck Execution Contract" in prompt
+    assert "MUST map claim ids before scoring" in prompt
+    assert "MUST call `score_batch(results, ...)`" in prompt
+    assert "MUST call `render_factcheck_markdown(batch)`" in prompt
+    assert "MUST call `mcp__artifact__record(...)`" in prompt
+
+
 def test_prompt_builder_enables_cross_quest_recall_only_for_shared_memory(temp_home: Path) -> None:
     ensure_home_layout(temp_home)
     config_manager = ConfigManager(temp_home)
