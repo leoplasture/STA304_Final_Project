@@ -22,8 +22,23 @@ def _read_pdf_like_text(path: Path) -> str:
     if suffix != ".pdf":
         return path.read_text(encoding="utf-8")
 
+    # Use PyPDF2 for proper PDF text extraction (installed in venv)
+    try:
+        from PyPDF2 import PdfReader
+
+        reader = PdfReader(str(path))
+        pages: list[str] = []
+        for page in reader.pages:
+            text = (page.extract_text() or "").strip()
+            if text:
+                pages.append(text)
+        if pages:
+            return "\n".join(pages)
+    except Exception:
+        pass
+
+    # Fallback: lightweight byte-decode for malformed PDFs
     raw = path.read_bytes()
-    # Lightweight fallback parser: decode printable chunks from PDF bytes.
     text = raw.decode("latin-1", errors="ignore")
     lines: list[str] = []
     for line in text.splitlines():
