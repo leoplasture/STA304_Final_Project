@@ -39,3 +39,8 @@ package-dir = {"" = "src"}
 where = ["src"]
 include = ["deepscientist", "deepscientist.*"]
 namespaces = false
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+]

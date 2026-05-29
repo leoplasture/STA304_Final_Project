@@ -8,7 +8,7 @@ Implemented files:
 - `src/deepscientist/factcheck/traffic_light.py` — RYG scoring
 - `src/deepscientist/factcheck/factcheck_render.py` — colored Markdown rendering
 - `src/skills/factcheck/SKILL.md` — model-facing factcheck prompt
-- `tests/test_traffic_light.py` — 23 tests for scoring + rendering
+- `tests/test_traffic_light.py` — 24 tests for scoring + rendering
 
 Modified files (MCP + runner registration):
 
@@ -169,7 +169,7 @@ MCP tools:
 
 ## Validation Status
 
-- `tests/test_traffic_light.py` — 23 tests, all passing (verified locally via `uv run pytest tests/test_traffic_light.py`)
+- `tests/test_traffic_light.py` — 24 tests, all passing (`uv run pytest tests/test_traffic_light.py` → 24 passed in 0.05s)
 - Scoring rules validated against all 7 verdict × confidence branches
 - Rendering output manually inspected for correct emoji and structure
 - MCP registration confirmed in all 4 integration points (server.py, base.py, builder.py, envelope.py)

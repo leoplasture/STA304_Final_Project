@@ -66,32 +66,36 @@ If you skip this step, scoring and rendering will produce broken output with bla
 
 ### Phase 3: Score and Render
 
-**You MUST call B's Python scoring functions. Do NOT compute scores manually.**
+**You MUST call the FactCheck MCP tools for scoring and rendering. Do NOT compute scores manually.**
 
-After collecting all VerificationResults (with claim_id already mapped), import and call:
+After collecting all VerificationResults (with claim_id already mapped), call:
 
-```python
-from deepscientist.factcheck.traffic_light import score_batch, score_verification
-from deepscientist.factcheck.factcheck_render import (
-    render_factcheck_markdown,
-    render_factcheck_summary,
-    render_claim_card,
+```
+# Step 1: Score all verification results and aggregate
+mcp__factcheck__score_batch(
+    results=<list of verify_claim dict results>,
+    quest_id="<quest_id>",
+    source_pdf="<pdf path>"
 )
-
-# 1. Score each verification result individually
-scored = [score_verification(vr) for vr in results]
-
-# 2. Aggregate into a batch result
-batch = score_batch(results, quest_id="<quest_id>", source_pdf="<pdf path>")
-
-# 3. Render the full report markdown (includes RYG colors + detail cards)
-report_md = render_factcheck_markdown(batch)
-
-# 4. Get a compact one-line summary
-summary = render_factcheck_summary(batch)
 ```
 
-The scoring rules (built into `score_verification`):
+Returns a dict with: `total_claims`, `green_count`, `yellow_count`, `red_count`, `score` (PASS/WARN/FAIL/N/A), and `results` (each with `color`, `label`, `rationale`).
+
+```
+# Step 2: Render the full colored Markdown report
+mcp__factcheck__render_report(batch_result=<dict from score_batch>)
+```
+
+Returns a formatted Markdown string with 🟢🟡🔴 summary table + per-claim detail cards. Use this as Section 1 of the final report.
+
+```
+# Step 3 (optional): Get a compact one-line summary
+mcp__factcheck__render_summary(batch_result=<dict from score_batch>)
+```
+
+Returns a short status line like `🟡 WARN — 0 green, 3 yellow, 0 red (3 claims)`.
+
+The scoring rules (built into `score_batch`):
 
 | verdict | confidence | color | label |
 |---------|-----------|-------|-------|
@@ -108,12 +112,6 @@ The batch score is automatically:
 - `yellow_count > total_claims * 0.3` → `"WARN"`
 - otherwise → `"PASS"`
 
-`render_factcheck_markdown()` produces a full colored Markdown report with:
-1. **Summary table**: green / yellow / red counts + final score (PASS / WARN / FAIL)
-2. **Per-claim detail cards**: verdict, confidence, evidence snippet, and rationale with RYG emoji
-
-Use `render_factcheck_markdown(batch)` as the FactCheck section of the final report. Do not hand-write the table.
-
 ### Phase 4: Generate Cross-Discipline Idea
 
 Based on the VERIFIED claims (green only), identify:
@@ -129,7 +127,7 @@ For any red claims, flag them as "citation errors — do not propagate."
 
 Write the complete report to a file and send it to the user via `artifact.interact`.
 
-**The FactCheck section MUST use the rendered output from `render_factcheck_markdown(batch)`** — it contains properly colored RYG emoji (🟢🟡🔴) and formatted claim cards. Do NOT replace it with a plain-text table.
+**The FactCheck section MUST use the rendered output from `mcp__factcheck__render_report(batch_result)`** — it contains properly colored RYG emoji (🟢🟡🔴) and formatted claim cards. Do NOT replace it with a plain-text table.
 
 Report structure:
 
@@ -137,7 +135,7 @@ Report structure:
 # Cross-Discipline Research Idea Report
 
 ## 1. FactCheck Results
-(Insert render_factcheck_markdown(batch) output here — includes 🟢🟡🔴 summary + per-claim cards)
+(Insert mcp__factcheck__render_report output here — includes 🟢🟡🔴 summary + per-claim cards)
 
 ## 2. Verified Evidence Base
 (Only 🟢 green claims — the reliable foundation)

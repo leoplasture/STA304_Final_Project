@@ -2720,6 +2720,148 @@ def build_factcheck_server(context: McpContext) -> FastMCP:
             "notes": result.notes,
         }
 
+    @server.tool(
+        name="score_batch",
+        description=(
+            "Score a list of verification results with RYG traffic lights and aggregate into a batch result. "
+            "Takes the list of dicts returned by verify_claim, scores each one (green/yellow/red), "
+            "and returns an aggregated FactCheckResult with counts and a PASS/WARN/FAIL score."
+        ),
+    )
+    def score_batch_tool(
+        results: list[dict[str, Any]],
+        quest_id: str = "",
+        source_pdf: str = "",
+    ) -> dict[str, Any]:
+        try:
+            from deepscientist.factcheck import VerificationResult
+            from deepscientist.factcheck.traffic_light import score_batch as _score_batch
+        except ImportError:
+            return {
+                "error": "factcheck module not available — Person B code not deployed",
+                "total_claims": len(results),
+                "green_count": 0,
+                "yellow_count": 0,
+                "red_count": 0,
+                "score": "N/A",
+                "results": [],
+            }
+
+        vrs: list[Any] = []
+        for r in results:
+            vrs.append(VerificationResult(
+                claim_id=r.get("claim_id", ""),
+                claim_text=r.get("claim_text", ""),
+                cited_paper=r.get("cited_paper", ""),
+                verdict=r.get("verdict", "uncertain"),
+                evidence_level=r.get("evidence_level", "abstract_only"),
+                evidence_snippet=r.get("evidence_snippet", ""),
+                confidence=float(r.get("confidence", 0.0)),
+                notes=r.get("notes", ""),
+            ))
+
+        batch = _score_batch(vrs, quest_id=quest_id, source_pdf=source_pdf)
+        return {
+            "quest_id": batch.quest_id,
+            "source_pdf": batch.source_pdf,
+            "total_claims": batch.total_claims,
+            "green_count": batch.green_count,
+            "yellow_count": batch.yellow_count,
+            "red_count": batch.red_count,
+            "score": batch.score,
+            "results": [
+                {
+                    "claim_id": s.claim_id,
+                    "claim_text": s.claim_text,
+                    "cited_paper": s.cited_paper,
+                    "verdict": s.verdict,
+                    "confidence": s.confidence,
+                    "color": s.color,
+                    "label": s.label,
+                    "rationale": s.rationale,
+                }
+                for s in batch.results
+            ],
+        }
+
+    @server.tool(
+        name="render_report",
+        description=(
+            "Render a FactCheckResult (from score_batch) into a full colored Markdown report. "
+            "Includes a summary table with 🟢🟡🔴 counts, per-claim detail cards, and PASS/WARN/FAIL verdict. "
+            "Use this output as Section 1 of the cross-discipline report."
+        ),
+    )
+    def render_report_tool(batch_result: dict[str, Any]) -> str:
+        try:
+            from deepscientist.factcheck import FactCheckResult, ScoredClaimResult
+            from deepscientist.factcheck.factcheck_render import render_factcheck_markdown
+        except ImportError:
+            return "⚠️ FactCheck module not available — cannot render report."
+
+        scored_list: list[Any] = []
+        for r in batch_result.get("results", []):
+            scored_list.append(ScoredClaimResult(
+                claim_id=r.get("claim_id", ""),
+                claim_text=r.get("claim_text", ""),
+                cited_paper=r.get("cited_paper", ""),
+                verdict=r.get("verdict", ""),
+                confidence=float(r.get("confidence", 0.0)),
+                color=r.get("color", "yellow"),
+                label=r.get("label", ""),
+                rationale=r.get("rationale", ""),
+            ))
+
+        result = FactCheckResult(
+            quest_id=batch_result.get("quest_id", ""),
+            source_pdf=batch_result.get("source_pdf", ""),
+            total_claims=int(batch_result.get("total_claims", 0)),
+            green_count=int(batch_result.get("green_count", 0)),
+            yellow_count=int(batch_result.get("yellow_count", 0)),
+            red_count=int(batch_result.get("red_count", 0)),
+            results=scored_list,
+        )
+        return render_factcheck_markdown(result)
+
+    @server.tool(
+        name="render_summary",
+        description=(
+            "Render a compact one-line FactCheck summary with RYG emoji. "
+            "Takes the dict output from score_batch and returns a short status line "
+            "suitable for inline progress updates."
+        ),
+    )
+    def render_summary_tool(batch_result: dict[str, Any]) -> str:
+        try:
+            from deepscientist.factcheck import FactCheckResult, ScoredClaimResult
+            from deepscientist.factcheck.factcheck_render import render_factcheck_summary
+        except ImportError:
+            return "⚠️ FactCheck N/A"
+
+        scored_list: list[Any] = []
+        for r in batch_result.get("results", []):
+            scored_list.append(ScoredClaimResult(
+                claim_id=r.get("claim_id", ""),
+                claim_text=r.get("claim_text", ""),
+                cited_paper=r.get("cited_paper", ""),
+                verdict=r.get("verdict", ""),
+                confidence=float(r.get("confidence", 0.0)),
+                color=r.get("color", "yellow"),
+                label=r.get("label", ""),
+                rationale=r.get("rationale", ""),
+            ))
+
+        result = FactCheckResult(
+            quest_id=batch_result.get("quest_id", ""),
+            source_pdf=batch_result.get("source_pdf", ""),
+            total_claims=int(batch_result.get("total_claims", 0)),
+            green_count=int(batch_result.get("green_count", 0)),
+            yellow_count=int(batch_result.get("yellow_count", 0)),
+            red_count=int(batch_result.get("red_count", 0)),
+            results=scored_list,
+        )
+        return render_factcheck_summary(result)
+
     return server
 
 
