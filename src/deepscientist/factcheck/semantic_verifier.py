@@ -79,45 +79,81 @@ def _search_arxiv_abstract(title: str, *, timeout: int) -> tuple[str, str]:
     return found_title, found_summary
 
 
-def _best_evidence_for_title(cited_paper_title: str, *, timeout: int) -> _PaperEvidence:
+def _best_evidence_for_title(cited_paper_title: str, *, timeout: int, fallback_query: str = "") -> _PaperEvidence:
+    """Search for paper evidence by title.  If the title is empty, falls back to
+    searching by *fallback_query* (e.g. the claim text) so that verification can
+    still proceed when the PDF parser cannot resolve numeric citation markers."""
     cited = cited_paper_title.strip()
-    if not cited:
-        return _PaperEvidence(cited_paper="", evidence_level="abstract_only", text="", snippet="")
 
-    # Priority: Semantic Scholar abstract -> arXiv abstract -> Crossref metadata title only.
-    try:
-        title, abstract = _search_semantic_scholar(cited, timeout=timeout)
-        if abstract.strip():
-            snippet = abstract.split(".")[0].strip()
-            return _PaperEvidence(cited_paper=title or cited, evidence_level="abstract_only", text=abstract, snippet=snippet)
-    except Exception:
-        pass
+    # --- first try the explicit paper title ---------------------------------
+    if cited:
+        try:
+            title, abstract = _search_semantic_scholar(cited, timeout=timeout)
+            if abstract.strip():
+                snippet = abstract.split(".")[0].strip()
+                return _PaperEvidence(cited_paper=title or cited, evidence_level="abstract_only", text=abstract, snippet=snippet)
+        except Exception:
+            pass
 
-    try:
-        title, summary = _search_arxiv_abstract(cited, timeout=timeout)
-        if summary.strip():
-            snippet = summary.split(".")[0].strip()
-            return _PaperEvidence(cited_paper=title or cited, evidence_level="abstract_only", text=summary, snippet=snippet)
-    except Exception:
-        pass
+        try:
+            title, summary = _search_arxiv_abstract(cited, timeout=timeout)
+            if summary.strip():
+                snippet = summary.split(".")[0].strip()
+                return _PaperEvidence(cited_paper=title or cited, evidence_level="abstract_only", text=summary, snippet=snippet)
+        except Exception:
+            pass
 
-    try:
-        title = _search_crossref_title(cited, timeout=timeout)
-        if title.strip():
-            return _PaperEvidence(
-                cited_paper=title,
-                evidence_level="abstract_only",
-                text=title,
-                snippet=title,
-            )
-    except Exception:
-        pass
+        try:
+            title = _search_crossref_title(cited, timeout=timeout)
+            if title.strip():
+                return _PaperEvidence(
+                    cited_paper=title,
+                    evidence_level="abstract_only",
+                    text=title,
+                    snippet=title,
+                )
+        except Exception:
+            pass
 
-    return _PaperEvidence(cited_paper=cited, evidence_level="abstract_only", text="", snippet="")
+        return _PaperEvidence(cited_paper=cited, evidence_level="abstract_only", text="", snippet="")
+
+    # --- fallback: search by claim keywords ---------------------------------
+    if fallback_query.strip():
+        query = _build_search_query(fallback_query)
+        if query:
+            try:
+                title, abstract = _search_semantic_scholar(query, timeout=timeout)
+                if title.strip():
+                    snippet = abstract.split(".")[0].strip() if abstract.strip() else ""
+                    return _PaperEvidence(
+                        cited_paper=title,
+                        evidence_level="abstract_only",
+                        text=abstract,
+                        snippet=snippet,
+                    )
+            except Exception:
+                pass
+
+    return _PaperEvidence(cited_paper="", evidence_level="abstract_only", text="", snippet="")
 
 
 def _tokenize(text: str) -> set[str]:
     return {tok for tok in re.findall(r"[a-z0-9]+", text.lower()) if len(tok) >= 3}
+
+
+def _build_search_query(claim_text: str) -> str:
+    """Build a short keyword query from claim text for paper-title search.
+
+    Strips citation markers and parenthetical expansions, then keeps only the
+    first 4-6 meaningful words — enough for Semantic Scholar title search."""
+    cleaned = re.sub(r"\[[\d,\-\s]+\]", "", claim_text)
+    # Remove parenthetical expansions like "(FL)", "(MHPFL)"
+    cleaned = re.sub(r"\([A-Z]{2,}\)", "", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    # Take first meaningful segment, keeping it short for title-matching
+    words = cleaned.split()
+    # Keep 4-7 words as a concise search phrase
+    return " ".join(words[:7]) if len(words) > 7 else cleaned
 
 
 def _heuristic_verdict(claim_text: str, evidence_text: str) -> tuple[str, float, str]:
@@ -141,17 +177,23 @@ def _heuristic_verdict(claim_text: str, evidence_text: str) -> tuple[str, float,
 
 def verify_claim(claim_text: str, cited_paper_title: str) -> VerificationResult:
     timeout = int(os.getenv("FACTCHECK_HTTP_TIMEOUT_SECONDS", str(_DEFAULT_TIMEOUT_SECONDS)))
-    evidence = _best_evidence_for_title(cited_paper_title, timeout=timeout)
+    evidence = _best_evidence_for_title(
+        cited_paper_title,
+        timeout=timeout,
+        fallback_query=claim_text if not cited_paper_title.strip() else "",
+    )
     if not evidence.text.strip():
         return VerificationResult(
             claim_id="",
             claim_text=claim_text,
-            cited_paper=evidence.cited_paper or cited_paper_title,
+            cited_paper=evidence.cited_paper or cited_paper_title or "(searched by claim text — no matching paper found)",
             verdict="not_found",
             evidence_level="abstract_only",
             evidence_snippet="",
             confidence=0.0,
-            notes="No abstract/full text found from providers.",
+            notes="No abstract/full text found from providers." + (
+                " Citation markers could not be resolved to paper titles." if not cited_paper_title.strip() else ""
+            ),
         )
 
     verdict, confidence, _ = _heuristic_verdict(claim_text, evidence.text)

@@ -48,21 +48,26 @@ mcp__factcheck__verify_claim(
 
 **CRITICAL — claim_id mapping (MUST DO, NOT OPTIONAL):**
 
-`verify_claim` does NOT receive `claim_id`. The returned `VerificationResult.claim_id` will be **empty string `""`**.
+You can pass `claim_id` directly to the MCP tool and it will be preserved:
 
-For every claim, copy the claim_id immediately after verify_claim returns:
-
-```python
-vr = verify_claim(claim.claim_text, claim.cited_paper_title)
-vr.claim_id = claim.claim_id   # <-- THIS LINE IS MANDATORY
-results.append(vr)
+```
+mcp__factcheck__verify_claim(
+    claim_text="<claim text>",
+    cited_paper_title="<paper title>",
+    claim_id="<claim_id>"    # <-- PASS THE CLAIM ID HERE
+)
 ```
 
-If you skip this step, scoring and rendering will produce broken output with blank claim IDs. There is no fallback.
+If you forget, manually copy it from the original Claim:
+
+```
+vr.claim_id = claim.claim_id   # fallback if claim_id was not passed
+```
 
 **Other rules:**
 - Process claims sequentially to respect API rate limits.
-- If `cited_paper_title` is empty, skip that claim and note it as unresolvable.
+- **Do NOT skip claims with empty `cited_paper_title`.** The verifier now handles empty titles by searching Semantic Scholar with keywords extracted from the claim text. Results may be uncertain, but the pipeline must still run.
+- **After verifying ALL claims, you MUST proceed to Phase 3** — even if every result was `not_found` or `uncertain`. A report with 🟡 WARN is the correct honest output, not a skipped pipeline.
 
 ### Phase 3: Score and Render
 

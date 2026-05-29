@@ -16,8 +16,8 @@ _SENTENCE_SPLIT_PATTERN = re.compile(r"(?<=[\.\!\?。！？])(?:\s+|\n+)")
 _ABBREV_PATTERN = re.compile(r"\b(?:et al|i\.e|e\.g|vs|fig|Fig|Eq|eq|Dr|Prof|Mr|Ms)\.", flags=re.IGNORECASE)
 _DECIMAL_PATTERN = re.compile(r"(\d+)\.(\d+)")
 _REFERENCE_HEADING_PATTERN = re.compile(
-    r"^(references|bibliography|参考文献)\s*$",
-    flags=re.IGNORECASE | re.MULTILINE,
+    r"\b(?:REFERENCES|BIBLIOGRAPHY|参考文献)\b\s*\[",
+    flags=re.IGNORECASE,
 )
 
 
@@ -95,28 +95,71 @@ def _split_main_and_references(text: str) -> tuple[str, str]:
     match = _REFERENCE_HEADING_PATTERN.search(text)
     if not match:
         return text, ""
-    return text[: match.start()].strip(), text[match.end() :].strip()
+    # The pattern matches up to and including the '[' after REFERENCES,
+    # e.g. "...REFERENCES [".  Back up to just before that '[' so the
+    # references text starts with "[1] ...".
+    bracket_pos = text.find("[", match.start())
+    if bracket_pos == -1:
+        return text, ""
+    return text[:bracket_pos].strip(), text[bracket_pos:].strip()
 
 
 def _parse_reference_index(reference_text: str) -> dict[str, str]:
-    marker_to_title: dict[str, str] = {}
-    if not reference_text:
-        return marker_to_title
+    """Build a mapping from citation markers to paper titles.
 
-    # Supports lines like:
-    # [1] Paper Title...
-    # [Smith et al. 2023] Paper Title...
-    for raw_line in reference_text.splitlines():
-        line = raw_line.strip()
-        if not line:
+    Splits the references text on every occurrence of ``[N]`` (including when
+    PDF extraction has collapsed multiple entries onto one line).  Extracts
+    the quoted paper title; falls back to the first sentence of the entry.
+    """
+    # ------------------------------------------------------------------
+    # 1. Split into per-entry blocks by finding every [N] or [Name]
+    # ------------------------------------------------------------------
+    # Try numeric markers first (IEEE style: [1], [19]); fall back to
+    # named markers ([Smith et al. 2023]) for non-standard formats.
+    _DIGIT_MARKER = re.compile(r"\[(\d+(?:[–,\-\s]+\d+)*)\]\s*")
+    _NAMED_MARKER = re.compile(r"\[([^\]]+)\]\s*")
+
+    blocks: list[tuple[str, str]] = []  # (marker, body)
+
+    digit_matches = list(_DIGIT_MARKER.finditer(reference_text))
+    if digit_matches:
+        entry_pattern = _DIGIT_MARKER
+        matches = digit_matches
+    else:
+        entry_pattern = _NAMED_MARKER
+        matches = list(_NAMED_MARKER.finditer(reference_text))
+
+    for m in matches:
+        marker = m.group(1).strip()
+        start = m.end()
+        # Body runs until the next entry marker or end of text
+        next_match = entry_pattern.search(reference_text, start)
+        body = reference_text[start:next_match.start()] if next_match else reference_text[start:]
+        blocks.append((marker, body.strip()))
+
+    # ------------------------------------------------------------------
+    # 2. For each block, extract the paper title (prefer quoted title)
+    # ------------------------------------------------------------------
+    marker_to_title: dict[str, str] = {}
+    _QUOTED_TITLE = re.compile(r"[\"“”„‘’「」『』]([^\"“”„‘’「」『』]+)[\"“”„‘’「」『』]")
+    _SENTENCE = re.compile(r"([^\.]+\.)")
+
+    for marker, body in blocks:
+        if not body:
             continue
-        match = re.match(r"^\[([^\]]+)\]\s*(.+)$", line)
-        if not match:
+        # Strategy A: pull the first quoted string (the paper title)
+        qt = _QUOTED_TITLE.search(body)
+        if qt:
+            marker_to_title[marker] = qt.group(1).strip()
             continue
-        marker = match.group(1).strip()
-        title = match.group(2).strip()
-        if marker and title:
-            marker_to_title[marker] = title
+        # Strategy B: use the first sentence as a fallback label
+        st = _SENTENCE.search(body)
+        if st:
+            marker_to_title[marker] = st.group(1).strip()
+            continue
+        # Strategy C: raw first 120 chars
+        marker_to_title[marker] = body[:120].strip()
+
     return marker_to_title
 
 
