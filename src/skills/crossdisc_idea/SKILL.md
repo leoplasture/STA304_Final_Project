@@ -128,11 +128,28 @@ Based on the VERIFIED claims (green only), identify:
 For any yellow claims, note them as "needs further verification" but do NOT base new ideas on them.
 For any red claims, flag them as "citation errors — do not propagate."
 
+**Wording discipline (MUST FOLLOW):**
+
+The report's language strength MUST NOT exceed what the FactCheck results justify.
+Use hedging language whenever the evidence is incomplete:
+
+| Instead of | Use |
+|------------|-----|
+| perfectly matches / fully supports | partially aligns with / provides partial support for |
+| genuinely novel / clearly demonstrates | potentially novel / suggests / indicates |
+| strongest evidence | relatively stronger evidence |
+| This is a genuinely novel direction | This may indicate a potentially novel direction, but further comparison with related work is needed |
+
+When the FactCheck score is WARN or FAIL, do NOT claim the idea is "strongly supported" or "verified."
+Use phrases like "preliminary verification suggests" and "further manual review is recommended."
+
 ### Phase 5: Output
 
-Write the complete report to a file and send it to the user via `artifact.interact`.
+**Step 5a — Write report**
 
-**The FactCheck section MUST use the rendered output from `mcp__factcheck__render_report(batch_result)`** — it contains properly colored RYG emoji (🟢🟡🔴) and formatted claim cards. Do NOT replace it with a plain-text table.
+Write the complete report to a file (e.g. `crossdisc-idea-report.md`) and send it to the user via `artifact.interact`.
+
+The FactCheck section MUST use the rendered output from `mcp__factcheck__render_report(batch_result)` — it contains properly colored RYG emoji (🟢🟡🔴) and formatted claim cards. Do NOT replace it with a plain-text table.
 
 Report structure:
 
@@ -140,19 +157,70 @@ Report structure:
 # Cross-Discipline Research Idea Report
 
 ## 1. FactCheck Results
-(Insert mcp__factcheck__render_report output here — includes 🟢🟡🔴 summary + per-claim cards)
+(Insert mcp__factcheck__render_report output here — includes 🟢🟡🔴 summary + per-claim detail cards)
 
-## 2. Verified Evidence Base
-(Only 🟢 green claims — the reliable foundation)
+## 2. Evidence Chain Table
+(Always include this table; use claim data and verification results)
 
-## 3. Cross-Discipline Bridges
+| Evidence ID | Claim ID | Claim Summary | Source | Extraction Method | Verdict | Traffic Light |
+|-------------|----------|---------------|--------|-------------------|---------|---------------|
+| E001 | C001 | FL enables collaborative training | Semantic Scholar (abstract) | parse_pdf | uncertain | 🟡 |
+| E002 | C002 | MHPFL enables heterogeneous models | arXiv (abstract) | parse_pdf | not_found | 🟡 |
+| (if parser failed) | C00X | — | — | bash_fallback | — | ⚪ |
+
+## 3. Verified Evidence Base
+(Only 🟢 green claims — the reliable foundation for Phase 4)
+
+## 4. Cross-Discipline Bridges
 (Methods/insights from the paper applied to new domains)
 
-## 4. Proposed Hypothesis
+## 5. Proposed Hypothesis
 (A concrete, testable idea grounded in verified claims)
 
-## 5. Caveats
-(🟡 Yellow / 🔴 red claims that need attention before acting on them)
+## 6. Caveats
+(🟡 Yellow / 🔴 red claims that need attention. Use hedging language per Phase 4.)
+```
+
+**Step 5b — Write structured experiment memory**
+
+After the report is complete, call `mcp__memory__write` with this schema:
+
+```
+mcp__memory__write(
+    kind="episodes",
+    title="FactCheck Experiment: <paper title>",
+    markdown=<the full report content>,
+    scope="quest",
+    metadata={
+        "quest_id": "<quest_id>",
+        "timestamp": "<ISO timestamp>",
+        "paper_title": "<paper title>",
+        "claims_parsed": <N>,
+        "claims_with_title": <N>,
+        "verification_results": {
+            "green": <N>, "yellow": <N>, "red": <N>,
+            "score": "<PASS|WARN|FAIL|N/A>"
+        },
+        "artifacts": ["crossdisc-idea-report.md"],
+        "extraction_method": "parse_pdf",
+        "verifier_notes": "(any known limitations — e.g. abstract-only, false positive risks)"
+    }
+)
+```
+
+The `kind` value MUST be `"episodes"` (plural — the system supports: papers, ideas, decisions, episodes, knowledge, templates).
+
+**Step 5c — Record artifact**
+
+After memory write, call `mcp__artifact__record` to persist the report in the evidence store:
+
+```
+mcp__artifact__record(
+    kind="experiment_report",
+    title="Cross-Discipline Idea Report — <paper title>",
+    body=<the full report>,
+    metadata={"factcheck_score": "<PASS|WARN|FAIL|N/A>"}
+)
 ```
 
 ## Notes
@@ -160,4 +228,6 @@ Report structure:
 - This skill depends on the `factcheck` MCP namespace being available. It is auto-registered in modern runner configurations.
 - The `mcp__factcheck__parse_pdf` tool handles `.pdf`, `.txt`, and `.md` inputs.
 - API-based verification searches Semantic Scholar → arXiv → Crossref. Results may be abstract-only.
-- Always copy `claim_id` from `Claim` to `VerificationResult` before scoring — the verifier does not do this.
+- Claim ID mapping is done by passing `claim_id` to `verify_claim`; verify_claim returns it back unchanged.
+- If `parse_pdf` fails and bash_exec fallback is used, record `extraction_method: bash_fallback` in the evidence chain table.
+- Memory kind MUST be `episodes` (plural), not `episode` (singular). Using singular will raise ValueError.
