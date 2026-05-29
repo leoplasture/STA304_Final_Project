@@ -46,29 +46,73 @@ mcp__factcheck__verify_claim(
 )
 ```
 
-**Critical integration rules:**
-- `verify_claim` does NOT receive `claim_id`. The returned `VerificationResult.claim_id` will be empty.
-- You MUST copy the `claim_id` from the original `Claim` into each `VerificationResult` before passing to scoring or rendering.
+**CRITICAL — claim_id mapping (MUST DO, NOT OPTIONAL):**
+
+`verify_claim` does NOT receive `claim_id`. The returned `VerificationResult.claim_id` will be **empty string `""`**.
+
+For every claim, copy the claim_id immediately after verify_claim returns:
+
+```python
+vr = verify_claim(claim.claim_text, claim.cited_paper_title)
+vr.claim_id = claim.claim_id   # <-- THIS LINE IS MANDATORY
+results.append(vr)
+```
+
+If you skip this step, scoring and rendering will produce broken output with blank claim IDs. There is no fallback.
+
+**Other rules:**
 - Process claims sequentially to respect API rate limits.
 - If `cited_paper_title` is empty, skip that claim and note it as unresolvable.
 
 ### Phase 3: Score and Render
 
-For each verification result, determine the traffic-light color:
+**You MUST call B's Python scoring functions. Do NOT compute scores manually.**
 
-| verdict | confidence | color | meaning |
-|---------|-----------|-------|---------|
-| `supported` | ≥ 0.8 | 🟢 green | Claim is correct |
-| `supported` | < 0.8 | 🟡 yellow | Partially supported |
-| `contradicted` | ≥ 0.7 | 🔴 red | Claim is wrong |
-| `contradicted` | < 0.7 | 🟡 yellow | Possibly wrong, uncertain |
-| `uncertain` | any | 🟡 yellow | Cannot determine |
-| `not_found` | any | 🟡 yellow | Cited paper not found |
+After collecting all VerificationResults (with claim_id already mapped), import and call:
 
-Produce a FactCheck report with:
+```python
+from deepscientist.factcheck.traffic_light import score_batch, score_verification
+from deepscientist.factcheck.factcheck_render import (
+    render_factcheck_markdown,
+    render_factcheck_summary,
+    render_claim_card,
+)
+
+# 1. Score each verification result individually
+scored = [score_verification(vr) for vr in results]
+
+# 2. Aggregate into a batch result
+batch = score_batch(results, quest_id="<quest_id>", source_pdf="<pdf path>")
+
+# 3. Render the full report markdown (includes RYG colors + detail cards)
+report_md = render_factcheck_markdown(batch)
+
+# 4. Get a compact one-line summary
+summary = render_factcheck_summary(batch)
+```
+
+The scoring rules (built into `score_verification`):
+
+| verdict | confidence | color | label |
+|---------|-----------|-------|-------|
+| `supported` | ≥ 0.8 | 🟢 green | 正确 |
+| `supported` | < 0.8 | 🟡 yellow | 不确定 |
+| `contradicted` | ≥ 0.7 | 🔴 red | 错误 |
+| `contradicted` | < 0.7 | 🟡 yellow | 不确定 |
+| `uncertain` | any | 🟡 yellow | 不确定 |
+| `not_found` | any | 🟡 yellow | 不确定 |
+
+The batch score is automatically:
+- `0 total_claims` → `"N/A"`
+- `red_count > 0` → `"FAIL"`
+- `yellow_count > total_claims * 0.3` → `"WARN"`
+- otherwise → `"PASS"`
+
+`render_factcheck_markdown()` produces a full colored Markdown report with:
 1. **Summary table**: green / yellow / red counts + final score (PASS / WARN / FAIL)
-2. **Per-claim detail cards**: verdict, confidence, evidence snippet, and rationale
-3. **Overall verdict**: if any red → FAIL; if >30% yellow → WARN; otherwise PASS
+2. **Per-claim detail cards**: verdict, confidence, evidence snippet, and rationale with RYG emoji
+
+Use `render_factcheck_markdown(batch)` as the FactCheck section of the final report. Do not hand-write the table.
 
 ### Phase 4: Generate Cross-Discipline Idea
 
@@ -83,16 +127,20 @@ For any red claims, flag them as "citation errors — do not propagate."
 
 ### Phase 5: Output
 
-Write the complete report (FactCheck results + cross-discipline ideas) to a file and send it to the user via `artifact.interact`. The report should include:
+Write the complete report to a file and send it to the user via `artifact.interact`.
+
+**The FactCheck section MUST use the rendered output from `render_factcheck_markdown(batch)`** — it contains properly colored RYG emoji (🟢🟡🔴) and formatted claim cards. Do NOT replace it with a plain-text table.
+
+Report structure:
 
 ```markdown
 # Cross-Discipline Research Idea Report
 
 ## 1. FactCheck Results
-(Summary table + per-claim details from Phase 3)
+(Insert render_factcheck_markdown(batch) output here — includes 🟢🟡🔴 summary + per-claim cards)
 
 ## 2. Verified Evidence Base
-(Only green claims — the reliable foundation)
+(Only 🟢 green claims — the reliable foundation)
 
 ## 3. Cross-Discipline Bridges
 (Methods/insights from the paper applied to new domains)
@@ -101,7 +149,7 @@ Write the complete report (FactCheck results + cross-discipline ideas) to a file
 (A concrete, testable idea grounded in verified claims)
 
 ## 5. Caveats
-(Yellow/red claims that need attention before acting on them)
+(🟡 Yellow / 🔴 red claims that need attention before acting on them)
 ```
 
 ## Notes
