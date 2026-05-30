@@ -143,17 +143,67 @@ Use hedging language whenever the evidence is incomplete:
 When the FactCheck score is WARN or FAIL, do NOT claim the idea is "strongly supported" or "verified."
 Use phrases like "preliminary verification suggests" and "further manual review is recommended."
 
-### Phase 5: Output
+### Phase 5: Output (Strict State Machine)
 
-**Step 5a — Record to evidence store (MUST do first, before writing the report file)**
+This phase is a 5-state linear pipeline. Each state executes **exactly once**. After transitioning to the next state, you MUST NOT re-enter any previous state. If an exit check fails, retry the CURRENT state — do not skip ahead.
 
-Before writing the report, you MUST call `mcp__artifact__record` to persist the FactCheck results in the evidence store. This ensures the audit system can verify every evidence reference in the report.
+```
+STATE_1 → STATE_2 → STATE_3 → STATE_4 → STATE_5
+  Score    Render   Record    Memory    Deliver
+```
+
+---
+
+#### STATE 1 — Score (enter ONCE)
+
+Call `mcp__factcheck__score_batch` with ALL verification results from Phase 3:
+
+```
+mcp__factcheck__score_batch(
+    results=<list of ALL verify_claim result dicts>,
+    quest_id="<quest_id>",
+    source_pdf="<pdf path>"
+)
+```
+
+**Exit check — confirm ALL of these before leaving State 1:**
+- [ ] The returned object has `score` field equal to one of: `PASS`, `WARN`, `FAIL`, `N/A`
+- [ ] The returned object has `total_claims` matching the number of claims parsed in Phase 1
+- [ ] The returned object has `green_count`, `yellow_count`, `red_count` that sum to `total_claims`
+
+If ANY check fails: the `score_batch` call was incomplete. Re-call with all results. Do NOT compute scores manually.
+
+**After passing exit checks:** Store the result as `batch_result`. Proceed to State 2. **Never call score_batch again for this report.**
+
+---
+
+#### STATE 2 — Render (enter ONCE)
+
+Call `mcp__factcheck__render_report` with the batch_result from State 1:
+
+```
+mcp__factcheck__render_report(batch_result=<dict from State 1>)
+```
+
+**Exit check — confirm ALL of these before leaving State 2:**
+- [ ] The returned markdown string contains at least one of: 🟢, 🟡, 🔴
+- [ ] The returned markdown string is non-empty (≥ 200 characters)
+
+If ANY check fails: the render call was incomplete. Re-call `render_report` with the same `batch_result`. Do NOT hand-write the factcheck table.
+
+**After passing exit checks:** Store the result as `rendered_report`. Proceed to State 3.
+
+---
+
+#### STATE 3 — Record Evidence (enter ONCE)
+
+Call `mcp__artifact__record` to persist the FactCheck results. The `body` parameter MUST be the complete `batch_result` JSON string — do NOT truncate or summarize:
 
 ```
 mcp__artifact__record(
     kind="experiment_report",
     title="FactCheck: <paper title>",
-    body=<JSON string of batch_result from Phase 3>,
+    body=<JSON.stringify(batch_result) — FULL object, not a summary>,
     metadata={
         "total_claims": <N>,
         "green": <N>, "yellow": <N>, "red": <N>,
@@ -164,15 +214,25 @@ mcp__artifact__record(
 )
 ```
 
-**Step 5b — Write experiment memory (MUST do before sending report)**
+**Exit check — confirm ALL of these before leaving State 3:**
+- [ ] The returned status is `"ok"` (NOT `"calling"`, `"pending"`, or `"error"`)
+- [ ] The `body` you passed is ≥ 500 characters (a full batch_result, not a stub)
 
-After recording to evidence store, you MUST write a structured memory entry so future runs can reference this experiment:
+If ANY check fails: the record call was incomplete. Check the `body` parameter and re-call. Do NOT proceed to State 4 with an empty or truncated evidence record.
+
+**After passing exit checks:** Proceed to State 4. **Never call artifact.record for this quest again.**
+
+---
+
+#### STATE 4 — Write Memory (enter ONCE)
+
+Call `mcp__memory__write` with the FULL report content. The `kind` MUST be `"episodes"` (plural). Valid memory kinds: papers, ideas, decisions, episodes, knowledge, templates.
 
 ```
 mcp__memory__write(
     kind="episodes",
     title="FactCheck Experiment: <paper title>",
-    markdown=<the full report content>,
+    markdown=<the FULL report content — see State 5 template below>,
     scope="quest",
     metadata={
         "quest_id": "<quest_id>",
@@ -190,15 +250,21 @@ mcp__memory__write(
 )
 ```
 
-The `kind` value MUST be `"episodes"` (plural). Valid memory kinds are: papers, ideas, decisions, episodes, knowledge, templates.
+**Exit check — confirm ALL of these before leaving State 4:**
+- [ ] The `markdown` parameter is non-empty and ≥ 500 characters
+- [ ] The `markdown` contains the string `"## 1. FactCheck Results"` (or equivalent section header)
 
-**Step 5c — Write report**
+If ANY check fails: the memory write was incomplete. Re-call with the full report content in the `markdown` field. Do NOT proceed to State 5 with an empty memory entry.
 
-After recording evidence and memory, write the complete report to a file (e.g. `crossdisc-idea-report.md`) and send it to the user via `artifact.interact`.
+**After passing exit checks:** Proceed to State 5. **Never call memory.write for this quest again.**
 
-The FactCheck section MUST use the rendered output from `mcp__factcheck__render_report(batch_result)` — it contains properly colored RYG emoji (🟢🟡🔴) and formatted claim cards. Do NOT replace it with a plain-text table.
+---
 
-Report structure:
+#### STATE 5 — Write Report File & Deliver
+
+Only after States 1-4 have passed all exit checks, write the complete report to `crossdisc-idea-report.md` and send to the user via `artifact.interact(kind="milestone", ...)`.
+
+The report MUST use `rendered_report` (from State 2) as Section 1. Do NOT replace it with a plain-text table.
 
 ```markdown
 # Cross-Discipline Research Idea Report
@@ -207,7 +273,7 @@ Report structure:
 **FactCheck Score**: <PASS|WARN|FAIL> — 🟢 N correct, 🟡 N uncertain, 🔴 N wrong (N claims total)
 
 ## 1. FactCheck Results
-(Insert mcp__factcheck__render_report output here — includes 🟢🟡🔴 summary + per-claim detail cards)
+(Insert rendered_report from State 2 here — includes 🟢🟡🔴 summary + per-claim detail cards)
 
 ## 2. Evidence Chain Table
 (Always include this table, mapping each verified claim to an E-series evidence ID)
@@ -232,6 +298,15 @@ Report structure:
 ## 6. Caveats
 (🟡 Yellow / 🔴 red claims that need attention. Use hedging language per Phase 4.)
 ```
+
+---
+
+#### State Machine Rules (CRITICAL)
+
+- **No re-entry**: Once a state's exit checks pass, do NOT return to it. If you catch yourself about to call `score_batch` a second time, STOP — you already scored.
+- **No skipping**: Do not proceed to State N+1 until State N's exit checks are all confirmed.
+- **Failed exit check → retry SAME state**: If the exit check fails, fix the problem and re-call the SAME tool. Do not jump to a different state to "work around" the failure.
+- **No manual workarounds**: Do not compute scores, write factcheck tables, or summarize batch_results by hand. Always use the MCP tools for their intended purpose.
 
 ## Notes
 
