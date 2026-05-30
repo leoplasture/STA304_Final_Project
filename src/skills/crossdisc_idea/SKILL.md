@@ -160,11 +160,13 @@ Report structure:
 (Insert mcp__factcheck__render_report output here — includes 🟢🟡🔴 summary + per-claim detail cards)
 
 ## 2. Evidence Chain Table
-(Always include this table; use claim data and verification results)
+(Always include this table, mapping each verified claim to an E-series evidence ID)
+
+**Evidence ID mapping rule:** Map each claim ID to an evidence ID using the format `E{NNN}` where NNN matches the claim number. C001 → E001, C002 → E002, etc. For image/pdf attachments, use the evidence IDs already recorded in the evidence_store (e.g., E012-img, E018-pdf). This ensures all report evidence references are traceable through the evidence chain audit system, which recognizes `[E001]`, `[E001-img]`, and `[E001-pdf]` patterns.
 
 | Evidence ID | Claim ID | Claim Summary | Source | Extraction Method | Verdict | Traffic Light |
 |-------------|----------|---------------|--------|-------------------|---------|---------------|
-| E001 | C001 | FL enables collaborative training | Semantic Scholar (abstract) | parse_pdf | uncertain | 🟡 |
+| E001 | C001 | FL enables collaborative training | Semantic Scholar (abstract) | parse_pdf | supported | 🟢 |
 | E002 | C002 | MHPFL enables heterogeneous models | arXiv (abstract) | parse_pdf | not_found | 🟡 |
 | (if parser failed) | C00X | — | — | bash_fallback | — | ⚪ |
 
