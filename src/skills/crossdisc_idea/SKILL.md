@@ -201,7 +201,7 @@ Call `mcp__artifact__record` to persist the FactCheck results. The `body` parame
 
 ```
 mcp__artifact__record(
-    kind="experiment_report",
+    kind="report",
     title="FactCheck: <paper title>",
     body=<JSON.stringify(batch_result) — FULL object, not a summary>,
     metadata={
@@ -224,8 +224,8 @@ If ANY check fails: the record call was incomplete. Check the `body` parameter a
 
 **CRITICAL — do NOT call artifact.record again:**
 - You already persisted the evidence. There is exactly ONE evidence record per quest.
-- Do NOT call `artifact.record` with a different `kind` (e.g. `kind="report"`). The evidence record uses `kind="experiment_report"` — that is the only valid kind for this state.
-- Even if you think a second record with different kind is needed — it is NOT. Stop after one successful call.
+- Do NOT call `artifact.record` a second time — not with `kind="report"`, not with any other `kind`, not with a different `title`.
+- Even if you think a second record is needed — it is NOT. Stop after one successful call.
 
 ---
 
@@ -309,7 +309,7 @@ The report MUST use `rendered_report` (from State 2) as Section 1. Do NOT replac
 #### State Machine Rules (CRITICAL)
 
 - **No re-entry**: Once a state's exit checks pass, do NOT return to it. If you catch yourself about to call `score_batch` a second time, STOP — you already scored.
-- **No kind-switching**: `artifact.record` uses `kind="experiment_report"` exactly once. Calling it again with `kind="report"` or any other kind is still a duplicate — the evidence is already stored.
+- **No kind-switching**: `artifact.record` uses `kind="report"` exactly once. Do not call it again with any kind — the evidence is already stored. The artifact server's semantic deduplication will suppress duplicate `kind="report"` records with the same content anyway.
 - **No skipping**: Do not proceed to State N+1 until State N's exit checks are all confirmed.
 - **Failed exit check → retry SAME state**: If the exit check fails, fix the problem and re-call the SAME tool. Do not jump to a different state to "work around" the failure.
 - **No manual workarounds**: Do not compute scores, write factcheck tables, or summarize batch_results by hand. Always use the MCP tools for their intended purpose.
