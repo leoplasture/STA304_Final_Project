@@ -280,11 +280,14 @@ class PromptBuilder:
                 [
                     "",
                     "## FactCheck Execution Contract",
+                    "- MUST call `verify_claim` for every parsed claim. Do not verify a subset and infer the rest.",
                     "- MUST map claim ids before scoring: `vr.claim_id = claim.claim_id` for every parsed claim.",
-                    "- MUST call `score_batch(results, ...)` and MUST NOT compute PASS/WARN/FAIL manually.",
-                    "- MUST call `render_factcheck_markdown(batch)` and MUST NOT hand-write the factcheck table.",
-                    "- MUST call `mcp__artifact__record(...)` to persist the final report into evidence store before final delivery.",
+                    "- MUST call `score_batch(results, ...)` exactly once per report and MUST NOT compute PASS/WARN/FAIL manually.",
+                    "- MUST call `render_factcheck_markdown(batch)` (render_report step) and MUST NOT hand-write the factcheck table.",
+                    "- MUST call `mcp__artifact__record(...)` and confirm the returned status is successful (not `calling`/pending) before final delivery.",
+                    "- MUST call `mcp__memory__write(...)` once to persist the experiment summary after report generation.",
                     "- If `parse_pdf` returns `{ok:false, fallback_recommended:true}`, switch to extraction fallback and keep parser failure noted in report.",
+                    "- HARD STOP RULE: if any mandatory tool call above is missing, do not finalize the answer; continue execution until all mandatory calls are completed.",
                 ]
             )
         sections.extend(

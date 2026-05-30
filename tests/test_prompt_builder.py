@@ -100,10 +100,13 @@ def test_prompt_builder_injects_factcheck_execution_contract_for_crossdisc_idea(
     )
 
     assert "## FactCheck Execution Contract" in prompt
+    assert "MUST call `verify_claim` for every parsed claim" in prompt
     assert "MUST map claim ids before scoring" in prompt
-    assert "MUST call `score_batch(results, ...)`" in prompt
-    assert "MUST call `render_factcheck_markdown(batch)`" in prompt
+    assert "MUST call `score_batch(results, ...)` exactly once per report" in prompt
+    assert "MUST call `render_factcheck_markdown(batch)` (render_report step)" in prompt
     assert "MUST call `mcp__artifact__record(...)`" in prompt
+    assert "MUST call `mcp__memory__write(...)` once" in prompt
+    assert "HARD STOP RULE" in prompt
 
 
 def test_prompt_builder_enables_cross_quest_recall_only_for_shared_memory(temp_home: Path) -> None:
