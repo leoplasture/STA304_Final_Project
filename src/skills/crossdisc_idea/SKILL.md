@@ -220,7 +220,12 @@ mcp__artifact__record(
 
 If ANY check fails: the record call was incomplete. Check the `body` parameter and re-call. Do NOT proceed to State 4 with an empty or truncated evidence record.
 
-**After passing exit checks:** Proceed to State 4. **Never call artifact.record for this quest again.**
+**After passing exit checks:** Proceed to State 4.
+
+**CRITICAL — do NOT call artifact.record again:**
+- You already persisted the evidence. There is exactly ONE evidence record per quest.
+- Do NOT call `artifact.record` with a different `kind` (e.g. `kind="report"`). The evidence record uses `kind="experiment_report"` — that is the only valid kind for this state.
+- Even if you think a second record with different kind is needed — it is NOT. Stop after one successful call.
 
 ---
 
@@ -304,6 +309,7 @@ The report MUST use `rendered_report` (from State 2) as Section 1. Do NOT replac
 #### State Machine Rules (CRITICAL)
 
 - **No re-entry**: Once a state's exit checks pass, do NOT return to it. If you catch yourself about to call `score_batch` a second time, STOP — you already scored.
+- **No kind-switching**: `artifact.record` uses `kind="experiment_report"` exactly once. Calling it again with `kind="report"` or any other kind is still a duplicate — the evidence is already stored.
 - **No skipping**: Do not proceed to State N+1 until State N's exit checks are all confirmed.
 - **Failed exit check → retry SAME state**: If the exit check fails, fix the problem and re-call the SAME tool. Do not jump to a different state to "work around" the failure.
 - **No manual workarounds**: Do not compute scores, write factcheck tables, or summarize batch_results by hand. Always use the MCP tools for their intended purpose.

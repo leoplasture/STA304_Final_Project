@@ -242,11 +242,15 @@ class MemoryService:
             raise ValueError(f"Unknown memory kind: {kind}")
         root = self._root_for(scope, quest_root)
         folder = ensure_dir(root / kind)
-        if markdown and markdown.lstrip().startswith("---"):
-            parsed_metadata, parsed_body = load_markdown_document_from_text(markdown)
-            title = str(parsed_metadata.get("title") or title or "Untitled")
-            body = parsed_body
-            metadata = {**parsed_metadata, **(metadata or {})}
+        if markdown:
+            stripped = markdown.lstrip()
+            if stripped.startswith("---"):
+                parsed_metadata, parsed_body = load_markdown_document_from_text(markdown)
+                title = str(parsed_metadata.get("title") or title or "Untitled")
+                body = parsed_body
+                metadata = {**parsed_metadata, **(metadata or {})}
+            else:
+                body = markdown
         normalized = self._normalize_metadata(
             kind=kind,
             title=title,
