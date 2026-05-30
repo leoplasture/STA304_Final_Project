@@ -145,9 +145,56 @@ Use phrases like "preliminary verification suggests" and "further manual review 
 
 ### Phase 5: Output
 
-**Step 5a — Write report**
+**Step 5a — Record to evidence store (MUST do first, before writing the report file)**
 
-Write the complete report to a file (e.g. `crossdisc-idea-report.md`) and send it to the user via `artifact.interact`.
+Before writing the report, you MUST call `mcp__artifact__record` to persist the FactCheck results in the evidence store. This ensures the audit system can verify every evidence reference in the report.
+
+```
+mcp__artifact__record(
+    kind="experiment_report",
+    title="FactCheck: <paper title>",
+    body=<JSON string of batch_result from Phase 3>,
+    metadata={
+        "total_claims": <N>,
+        "green": <N>, "yellow": <N>, "red": <N>,
+        "score": "<PASS|WARN|FAIL|N/A>",
+        "source_pdf": "<path to PDF>",
+        "extraction_method": "parse_pdf"
+    }
+)
+```
+
+**Step 5b — Write experiment memory (MUST do before sending report)**
+
+After recording to evidence store, you MUST write a structured memory entry so future runs can reference this experiment:
+
+```
+mcp__memory__write(
+    kind="episodes",
+    title="FactCheck Experiment: <paper title>",
+    markdown=<the full report content>,
+    scope="quest",
+    metadata={
+        "quest_id": "<quest_id>",
+        "timestamp": "<ISO timestamp>",
+        "paper_title": "<paper title>",
+        "claims_parsed": <N>,
+        "verification_results": {
+            "green": <N>, "yellow": <N>, "red": <N>,
+            "score": "<PASS|WARN|FAIL|N/A>"
+        },
+        "artifacts": ["crossdisc-idea-report.md"],
+        "extraction_method": "parse_pdf",
+        "verifier_notes": "abstract-only verification; false positives possible on title mismatch"
+    }
+)
+```
+
+The `kind` value MUST be `"episodes"` (plural). Valid memory kinds are: papers, ideas, decisions, episodes, knowledge, templates.
+
+**Step 5c — Write report**
+
+After recording evidence and memory, write the complete report to a file (e.g. `crossdisc-idea-report.md`) and send it to the user via `artifact.interact`.
 
 The FactCheck section MUST use the rendered output from `mcp__factcheck__render_report(batch_result)` — it contains properly colored RYG emoji (🟢🟡🔴) and formatted claim cards. Do NOT replace it with a plain-text table.
 
@@ -155,6 +202,9 @@ Report structure:
 
 ```markdown
 # Cross-Discipline Research Idea Report
+
+**Paper**: <resolved paper title>
+**FactCheck Score**: <PASS|WARN|FAIL> — 🟢 N correct, 🟡 N uncertain, 🔴 N wrong (N claims total)
 
 ## 1. FactCheck Results
 (Insert mcp__factcheck__render_report output here — includes 🟢🟡🔴 summary + per-claim detail cards)
@@ -181,48 +231,6 @@ Report structure:
 
 ## 6. Caveats
 (🟡 Yellow / 🔴 red claims that need attention. Use hedging language per Phase 4.)
-```
-
-**Step 5b — Write structured experiment memory**
-
-After the report is complete, call `mcp__memory__write` with this schema:
-
-```
-mcp__memory__write(
-    kind="episodes",
-    title="FactCheck Experiment: <paper title>",
-    markdown=<the full report content>,
-    scope="quest",
-    metadata={
-        "quest_id": "<quest_id>",
-        "timestamp": "<ISO timestamp>",
-        "paper_title": "<paper title>",
-        "claims_parsed": <N>,
-        "claims_with_title": <N>,
-        "verification_results": {
-            "green": <N>, "yellow": <N>, "red": <N>,
-            "score": "<PASS|WARN|FAIL|N/A>"
-        },
-        "artifacts": ["crossdisc-idea-report.md"],
-        "extraction_method": "parse_pdf",
-        "verifier_notes": "(any known limitations — e.g. abstract-only, false positive risks)"
-    }
-)
-```
-
-The `kind` value MUST be `"episodes"` (plural — the system supports: papers, ideas, decisions, episodes, knowledge, templates).
-
-**Step 5c — Record artifact**
-
-After memory write, call `mcp__artifact__record` to persist the report in the evidence store:
-
-```
-mcp__artifact__record(
-    kind="experiment_report",
-    title="Cross-Discipline Idea Report — <paper title>",
-    body=<the full report>,
-    metadata={"factcheck_score": "<PASS|WARN|FAIL|N/A>"}
-)
 ```
 
 ## Notes
