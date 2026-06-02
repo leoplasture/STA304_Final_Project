@@ -17,14 +17,19 @@
 
 **方向 A：科研智能体功能扩展 — 证据链追踪模块**
 
-本方向要求为科研 Agent 增加"证据链追踪模块"，使系统输出可追踪、可检查、可复现。具体包括：
+本方向包含两个递进要求：
+
+**第一层 — 证据链追踪**：使系统输出可追踪、可检查、可复现：
 - 记录输入材料与工具输出来源
 - 为关键结论标注 evidence ID 并说明来源位置
 - 区分三类内容：明确支持 / 合理推断 / 证据不足
 - 在 QQ 真实交互中展示该功能
 - 至少 5 个测试案例，含 1 个边界案例
 
-我们在此基础上进一步扩展——不仅追踪证据，还增加了**文献引用的语义验证**（Semantic Scholar / arXiv / Crossref API）和**红黄绿三色评分**机制。
+**第二层 — 文献引用语义验证**：对 Agent 报告中引用的论文声明进行自动查证：
+- 接入第三方文献 API（Semantic Scholar / arXiv / Crossref）核实引用是否真实存在
+- 实现红黄绿三色评分机制（🟢 原文支撑 / 🟡 无法确认 / 🔴 原文反驳）
+- 生成可审计的 evidence chain 表格，每一条 claim 对应一条 evidence 记录
 
 ---
 
@@ -39,7 +44,7 @@
 - Claude CLI runner 提供 LLM 调用基础设施
 - 开源 MIT 协议，允许二次开发
 
-**我们的改造范围**：新建 4 个 Python 模块（claim_extractor, semantic_verifier, traffic_light, factcheck_render）+ 1 个 Skill 文件（crossdisc_idea）+ 修改 3 个框架文件（server.py, builder.py, mcp/server.py）。其余为框架原有组件。
+**我们的改造范围**：新建 4 个 Python 模块（claim_extractor, semantic_verifier, traffic_light, factcheck_render）+ 1 个 Skill 文件（crossdisc_idea）+ 修改 3 个框架文件（mcp/server.py, prompts/builder.py, pyproject.toml）。其余为框架原有组件。
 
 ---
 
@@ -77,32 +82,66 @@
 ```
 ┌──────────┐    ┌───────────────┐    ┌──────────────┐    ┌───────────────┐
 │ QQ 用户   │ →  │ crossdisc_idea│ →  │ parse_pdf    │ →  │ verify_claim  │
-│ 上传 PDF  │    │ Skill (C)     │    │ (A: PyPDF2)  │    │ ×N (A: S2/    │
-└──────────┘    └───────────────┘    └──────────────┘    │ arXiv/Crossref)│
+│ 上传 PDF  │    │ Skill         │    │    (PyPDF2)  │    │ ×N (S2/arXiv/ │
+└──────────┘    └───────────────┘    └──────────────┘     │    Crossref)  │
       ↑                                                   └───────┬───────┘
       │                                                           ↓
       │              ┌───────────────────┐    ┌───────────────────────┐
-      │              │ render_report (B) │ ←  │ score_batch (B)       │
-      │              │ 彩色 Markdown 表格  │    │ 🟢🟡🔴 traffic_light  │
+      │              │ render_report     │ ←  │ score_batch           │
+      │              │ 彩色 Markdown 表格 │    │🟢🟡🔴 traffic_light │
       │              └─────────┬─────────┘    └───────────────────────┘
       │                        ↓
       │              ┌───────────────────────┐
       │   QQ 返回     │ artifact__record +   │
-      └──────────────│ memory__write (C)    │
+      └──────────────│ memory__write         │
                      └───────────────────────┘
 ```
 
-### 4.2 三层验证链路
+### 4.2 流水线详解
 
-| 层级 | 组件 | 功能 | 负责人 |
-|------|------|------|--------|
-| 入口层 | QQ connector + evidence chain | 多模态消息录制，生成 E00X 证据 ID | C |
-| 工具层 | claim_extractor + semantic_verifier | PDF 解析 + Semantic Scholar/arXiv/Crossref 三源验证 | A |
-| 评分层 | traffic_light + factcheck_render | 🟢🟡🔴 七条评分分支 + Markdown 渲染 | B |
-| 编排层 | crossdisc_idea SKILL.md | 5-Phase 状态机（Score→Render→Record→Memory→Deliver） | C |
-| 强约层 | prompts/builder.py HARD STOP RULE | 所有强制工具调用不允许跳过 | A |
+**Phase 0 — PDF 解析 (parse_pdf)**：PyPDF2 提取文本，正则定位参考文献段（`REFERENCES` heading + 首个 `[` 分隔），按 `[1]...[N]` 或 `[Author, Year]` 格式拆分条目，Unicode 引号匹配提取标题。输出截断保护（MAX_EXTRACTED_CHARS=200000, MAX_RETURNED_CLAIMS=40）。
 
-### 4.3 证据链数据结构
+**Phase 1 — 声明验证 (verify_claim × N)**：对每条 claim 执行三级 fallback 链路：
+1. **Semantic Scholar**：按 cited_paper_title 搜索，返回 title+abstract
+2. **arXiv**：Title API 匹配，返回 abstract
+3. **Crossref**：DOI/title 搜索，返回 abstract
+
+每级失败自动 fallback 到下一级。若 cited_paper_title 为空，从 claim_text 中提取关键词（去引用标记，保留前 7 个实词）构建搜索查询。返回 verdict（supported/not_found/contradicted）+ confidence + evidence。
+
+**Phase 2 — 批量评分 (score_batch)**：对所有 VerificationResult 执行 7 条评分分支：
+| 条件 | 评分 | 信号 |
+|------|------|------|
+| verdict=supported, confidence≥0.7 | 🟢 Green | 原文明确支撑 |
+| verdict=supported, confidence<0.7 | 🟡 Yellow | 低置信度支撑 |
+| verdict=not_found | 🟡 Yellow | 无法在原文验证 |
+| verdict=contradicted, confidence≥0.7 | 🔴 Red | 原文明确反驳 |
+| verdict=contradicted, confidence<0.7 | 🟡 Yellow | 低置信度反驳 |
+| evidence为空且无cited_paper | 🟡 Yellow | 无可验证来源 |
+| 异常/超时 | ⚪ N/A | 验证失败 |
+
+批次总分：🟢≥80% → PASS, 🔴≥30% → FAIL, 🟡≥80% → WARN, 否则 FAIL。
+
+**Phase 3 — 报告渲染 (render_report)**：生成三部分 Markdown——
+- Summary 表（🟢🟡🔴 计数 + PASS/WARN/FAIL）
+- Per-Claim 详情卡（判决 + 置信度 + 引用原文摘录）
+- Evidence Chain 表格（E00X → C00X 映射，含 verdict 与 traffic light）
+
+**Phase 4 — 证据留存**：artifact__record 持久化完整 FactCheckResult JSON（含所有 VerificationResult 和 ScoredClaimResult），memory__write 写入 episodes 记忆供后续 quest 参考。
+
+### 4.3 核心数据结构
+
+流程中传递三个核心 dataclass：
+
+```
+Claim(text, cited_paper_title, claim_id)
+  → VerificationResult(claim_id, verdict, confidence, evidence, source)
+    → ScoredClaimResult(claim_id, traffic_light, ...)
+      → FactCheckResult(claims[], score, summary_stats, ...)
+```
+
+claim_id 格式为 `C{NNN}`，在全流程中透传，保证每一条 claim 从 parse 到 evidence chain 全程可追踪。
+
+### 4.4 证据链数据结构
 
 所有证据以 `E{NNN}` 格式存入 `evidence_store.json`：
 
@@ -114,7 +153,7 @@
 
 `audit_report()` 自动扫描报告中的 `[E001]`、`[E001-img]`、`[E001-pdf]` 引用，交叉验证 evidence_store。
 
-### 4.4 强制合同机制
+### 4.5 强制合同机制
 
 为确保 Agent 不绕过工具链，实施了双层强制机制：
 
@@ -141,24 +180,24 @@ do not finalize the answer.
 | test_connector_evidence.py | 6 | C |
 | test_evidence_chain.py | 10 | A |
 | test_evidence_audit.py | 14 | B |
-| test_factcheck.py | 4 | A |
-| test_traffic_light.py | 23 | B |
+| test_factcheck.py | 6 | A |
+| test_traffic_light.py | 24 | B |
 | test_factcheck_integration.py | 10 | C |
-| test_prompt_builder.py | 1 | A |
-| **总计** | **68** | **全部通过** |
+| test_prompt_builder.py | 69 | A |
+| **总计** | **139** | **全部通过** |
 
 ### 5.2 真实 Quest 验证（6 个学科）
 
 | Quest | 学科领域 | 论文主题 | Claims | verify_claim | 评分 | 工具合规 |
 |-------|---------|---------|--------|-------------|------|---------|
-| 027 | ML/联邦学习 | pFedAFM | 40 | 40 | 🟢17 🟡18 🔴5 FAIL | 6/6 ✅ |
-| 028 | 医学教育 | Subinternship Directors | 8 | 8 | 🟢1 🟡6 🔴1 FAIL | 6/6 ✅ |
-| 029 | 计算化学 | DFT Metal Clusters | 1 | 1 | 🟢1 🟡0 🔴0 PASS | 6/6 ✅ |
-| 030 | 优化理论 | SGD Convergence | 40 | 49 | 🟢10 🟡28 🔴2 FAIL | 6/6 ✅ |
-| 031 | 引力波物理 | LIGO PEMcheck | 40 | 45 | 🟢2 🟡37 🔴1 FAIL | 6/6 ✅ |
-| 032 | ML 综述 | Federated Learning Survey | N/A | 1 | — | 6/6 ✅ |
+| 027 | ML/联邦学习 | pFedAFM | 40 | 85 | 🟢17 🟡18 🔴5 FAIL | 6/6 ✅ |
+| 028 | 医学教育 | Subinternship Directors | 8 | 27 | 🟢1 🟡6 🔴1 FAIL | 6/6 ✅ |
+| 029 | 计算化学 | DFT Metal Clusters | 1 | 7 | 🟢1 🟡0 🔴0 PASS | 6/6 ✅ |
+| 030 | 优化理论 | SGD Convergence | 40 | 105 | 🟢10 🟡28 🔴2 FAIL | 6/6 ✅ |
+| 031 | 引力波物理 | LIGO PEMcheck | 40 | 94 | 🟢2 🟡37 🔴1 FAIL | 6/6 ✅ |
+| 032 | ML 综述 | Federated Learning Survey | 1 | 5 | 🟢0 🟡1 🔴0 WARN | 6/6 ✅ |
 
-**总计**：996 个 events，144 次 verify_claim 调用，36/36 强制工具调用全部完成。
+**总计**：996 个 events，323 次 verify_claim 调用，36/36 强制工具调用全部完成。
 
 ### 5.3 边界案例覆盖
 
@@ -199,13 +238,7 @@ do not finalize the answer.
 
 **系统如何处理**：SKILL.md Phase 0 有明确的 pdf-fallback 指令——如果 `parse_pdf` 返回空列表，Agent 自动退回到 `bash_exec` 手动提取。report 中 extraction_method 标注为 `bash_fallback`，证据链表格中标注为 ⚪。全流程仍然完成（8 claims 验证 + 6/6 工具合规）。
 
-### 6.4 API 兼容性导致 Runner 崩溃（早期版本）
-
-**案例**：开发早期（v2.1 阶段），DeepSeek API 不支持 Anthropic Messages API 的 `system` role，导致 ~80% 的 quest 在启动阶段崩溃。
-
-**修复**：锁定 Claude Code 版本到 2.1.153，添加 `--strict-mcp-config`，过滤 PATH 中的系统 Python，将 TEMP 重定向到非系统盘。
-
-### 6.5 Agent 绕过工具链（中期版本）
+### 6.4 Agent 绕过工具链（中期版本）
 
 **案例**：早期 quest 027 中，Agent 虽然产出了看起来格式正确的报告，但实际上只调用了 10 次 verify_claim（40 claims 中），完全没有调用 score_batch 和 render_report——所有评分都是 LLM 手工做的。
 
@@ -228,7 +261,6 @@ do not finalize the answer.
 | PyPDF2 对扫描版 PDF 支持弱 | 纯图像 PDF 需要 OCR 预处理 | 低 |
 | Verifier 假阳性（标题匹配偏差） | 约 5-10% 的 🔴 可能是误报 | 中 |
 | API 依赖 | 无网络环境下完全不可用 | 低 |
-| DeepSeek API 兼容性 | Claude Code 版本升级可能再次引入问题 | 中 |
 | 视频/音频不支持 | 仅处理文本、图片、PDF | 低 |
 
 ### 7.2 未来改进
@@ -243,40 +275,68 @@ do not finalize the answer.
 
 ## 8. 个人与小组贡献说明
 
-### 8.1 小组贡献概览
+**廖苗懿 — Person A：工具层**
 
-| 成员 | 角色 | 核心技术贡献 |
-|------|------|-------------|
-| 廖苗懿 | Person A (工具层) | claim_extractor.py（PyPDF2 + 参考文献解析）、semantic_verifier.py（S2/arXiv/Crossref 三源验证）、prompts/builder.py HARD STOP RULE |
-| 熊筱瑜 | Person B (评分渲染) | traffic_light.py（7 分支 RYG 评分）、factcheck_render.py（彩色 Markdown 渲染）、MCP server.py 5 个工具注册 |
-| 刘宇翔 | Person C (入口+集成) | crossdisc_idea/SKILL.md（5-State Machine）、QQ 多模态证据录制、evidence chain 表格、memory schema、措辞规范、集成测试 |
+负责 FactCheck 链条的 PDF 入口与文献验证核心。
 
-### 8.2 个人贡献详述（Person C — 刘宇翔）
+- **`claim_extractor.py`**：PyPDF2 文本提取、参考文献段定位（heading pattern 匹配 + bracket 切割）、Unicode 引号匹配提取标题、MAX_EXTRACTED_CHARS/MAX_RETURNED_CLAIMS 截断保护、PDFExtractionError 异常体系
+- **`semantic_verifier.py`**：Semantic Scholar → arXiv → Crossref 三级 fallback 验证链、`_build_search_query()` 去引用标记保留前 7 实词、`_best_evidence_for_title()` fallback 关键词搜索
+- **`prompts/builder.py`**：crossdisc_idea 强制合同注入（HARD STOP RULE：score_batch、render_report、artifact__record 不可绕过）
+- **证据链核心**：evidence-chain tracking store、API 与 runner instrumentation
+- **测试**：`test_factcheck.py` (6)、`test_evidence_chain.py` (10)、`test_prompt_builder.py` (69)
 
-**新建文件**：
-- `src/skills/crossdisc_idea/SKILL.md` — 跨学科 idea skill（5-phase pipeline + 状态机 + exit checks）
-- `tests/test_factcheck_integration.py` — 10 个端到端集成测试
-- `tests/test_connector_evidence.py` — 6 个 QQ connector 证据录制测试
-- `docs/ProjectA_IntegrationReport.md` — 全流程集成报告
-- `docs/ProjectA_PersonC_Handoff_Draft.md` — 团队交接文档
-- `docs/Final_Project_Report.md` — 本报告
+**熊筱瑜 — Person B：评分渲染 + 全部测试**
 
-**修改文件**：
-- `src/deepscientist/evidence_chain.py` — PDF 附件支持（E00X-pdf）、文本占位符修复编号断层
-- `src/deepscientist/evidence_audit.py` — 扩展正则支持 E\d+-pdf 格式
-- `src/deepscientist/prompts/builder.py` — 图片/PDF 路径可见性 + attachment 处理规则
-- `src/deepscientist/runners/claude.py` — MCP PATH 过滤、TEMP 重定向、strict-mcp-config
-- `src/deepscientist/runners/simple_cli.py` — stdin 写入时序修复
-- `src/deepscientist/mcp/server.py` — interact 异步 dispatch 超时保护
-- `src/deepscientist/artifact/service.py` — channel.send() 线程超时
+负责 RYG 评分算法、Markdown 报告渲染、MCP 工具注册，以及全部 quest 实际运行。
 
-**Runner 环境修复**（开发期间，非框架修改）：
-- Claude CLI 版本锁定（2.1.152/2.1.153）
-- 系统 Python 进程隔离（PATH 过滤）
-- C: 盘磁盘满导致的各种 PermissionError/死锁修复
-- QQ connector 重复投递修复
+- **`traffic_light.py`**：`score_verification()` per-claim 🟢🟡🔴 判定 + `score_batch()` 批次 PASS/WARN/FAIL/N/A 汇总，覆盖 7 条评分分支（supported/not_found/contradicted × confidence 高低 + 空 evidence + 异常）
+- **`factcheck_render.py`**：`render_factcheck_markdown()` 彩色表格 + per-claim 详情卡、`render_factcheck_summary()` 摘要
+- **`mcp/server.py`**：`build_factcheck_server()` 注册 5 个 MCP tool（parse_pdf, verify_claim, score_batch, render_report, render_summary），dataclass ↔ dict 序列化
+- **SKILL.md 迭代**：claim_id 透传修复、Phase 5 重写为 5-State Machine、artifact kind 修正
+- **Pipeline 修复**：PDF 参考文献解析修复、全流程 scoring pipeline 打通
+- **证据链前期**：evidence chain audit module、prompt 证据协议
+- **全部 6 个测试样例 (027-032)**：PDF 选取（跨 6 学科）、quest 运行与调试、output-report + events.jsonl 收集
+- **测试**：`test_traffic_light.py` (24)、`test_evidence_audit.py` (14)、`test_connector_evidence.py` (6)
 
-**测试与验证**：
-- 编写 16 个测试用例（C 角色），全部通过
-- 参与 6 个真实 quest 的端到端验证
-- 证据链表格标准化、措辞降级规则制定
+ **刘宇翔 — Person C：入口与集成**
+
+负责 Skill 编排、QQ 多模态证据入口、daemon 集成与 memory schema。
+
+- **`crossdisc_idea/SKILL.md`**（109 行新增/修改）：
+  - 5-Phase pipeline 编排（parse → verify → score → render → deliver）
+  - Phase 5 重写为 5-State Machine（Score→Render→Record→Memory→Deliver），每步含 exit checks
+  - Phase 0 pdf-fallback 指令：parse_pdf 失败时自动退至 bash_exec 手动提取
+  - C→E evidence ID 映射规则（C001→E001），确保报告引用可被 audit_report 验证
+  - wording discipline 措辞规范：4 组强弱替换对照表（perfectly matches→partially aligns 等）
+  - memory schema 定义：`kind="episodes"`（修复单复数报错）、结构化 metadata 字段
+  - evidence chain 表格模板：Evidence ID + Claim ID + Source + Extraction Method + Verdict + Traffic Light
+
+- **QQ 多模态证据录制**（`evidence_chain.py`, `daemon/app.py`）：
+  - `record_connector_event()`：connector_text（E00X）、connector_image（E00X-img，含 SHA256 + 尺寸 + 格式）、connector_file（E00X-pdf，含页数 + SHA256 + PyPDF2 文本 sidecar）三类证据条目
+  - `_extract_pdf_text_sidecar()`：自动提取 PDF 全文至 `.ds/evidence/sidecars/`，80KB+ 文本
+  - `_pdf_metadata()`：PDF 元数据提取（页数、SHA256、文件大小）
+  - evidence recording hook 注入 daemon app.py 的 connector 消息路由链路
+
+- **daemon 集成与 Runner 修复**（`runners/claude.py`, `runners/simple_cli.py`）：
+  - MCP server PATH 过滤（移除系统 Python 路径，避免 MCP 进程重复）
+  - TEMP/TMP/TMPDIR 重定向至 DS_HOME（修复磁盘满导致 MCP 死锁）
+  - `--strict-mcp-config` 添加（禁用 Claude CLI 自动 MCP 发现）
+  - `pythonw.exe` → `python.exe` 校正（Windows daemon 后台进程修复）
+  - stdin 提前写入修复（Claude CLI ≥2.1.152 的 3s 输入超时导致 Runner 崩溃）
+  - `artifact.interact` 异步 dispatch（45s 线程超时，修复 QQ connector 慢响应阻塞 MCP stdio）
+  - QQ connector profile 重复投递修复
+
+- **`prompts/builder.py`**（C 协助 A/B 联调）：
+  - 图片/PDF attachment `raw_binary_path` 从 hidden 改为可见
+  - attachment_handling_rule 更新：图片 MUST Read、PDF MUST PyPDF2 提取
+
+- **证据链审计扩展**（`evidence_audit.py`）：
+  - 扩展 `_EVIDENCE_ID_PATTERN` 支持 `E\d+-pdf` 格式
+
+- **测试**：`test_connector_evidence.py` (6)、`test_factcheck_integration.py` (10)
+
+### 交叉协作
+
+- **Phase 5 强制执行**：A 提供 HARD STOP RULE (builder.py)，B 将 Phase 5 重写为 5-State Machine，C 提供 memory/artifact schema —— 三层共同保证 Agent 不绕过工具链
+- **证据链系统**：A 提供存储层与 runner 埋点，B 提供审计脚本与 prompt 协议，C 提供 QQ 多模态入口
+- **全流程打通**：B 主导 quest 实际运行、失败分析、pipeline 迭代修复
