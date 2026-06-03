@@ -64,29 +64,15 @@
 \begin{frame}{System Architecture}
   \begin{block}{Pipeline Flow}
     \begin{center}
-      \large
-      \textbf{Row 1 (Extraction)}\\ 
-      \texttt{QQ User}
-      \;$\longrightarrow$\;
-      \texttt{crossdisc\_idea (C)}
-      \;$\longrightarrow$\;
-      \texttt{parse\_pdf (A)}
-      \;$\longrightarrow$\;
-      \texttt{verify\_claim $\times$N (A)}
-
-      % \vspace{0.5cm}
-      \textbf{Row 2 (Scoring \& Output)}\\
-      \texttt{score\_batch (B)}
-      \;$\longrightarrow$\;
-      \texttt{render\_report (B)}
-      \;$\longrightarrow$\;
-      \texttt{artifact\_record + memory\_write (C)}
-      \;$\longrightarrow$\;
-      \texttt{QQ Returns RYG Report}
+      \normalsize
+      \textbf{Extraction:}\;
+      \texttt{QQ} $\to$ \texttt{crossdisc\_idea (C)} $\to$ \texttt{parse\_pdf (A)} $\to$ \texttt{verify\_claim $\times$N (A)}
+      \\[6pt]
+      \textbf{Scoring \& Output:}\;
+      \texttt{score\_batch (B)} $\to$ \texttt{render\_report (B)} $\to$ \texttt{record+memory (C)} $\to$ \texttt{QQ returns}
     \end{center}
   \end{block}
 
-  % \vspace{0.3cm}
   \begin{block}{Three Roles}
     \begin{description}
       \item[Person A --- Tool Layer] \texttt{claim\_extractor}, \texttt{semantic\_verifier}, HARD STOP RULE
@@ -105,11 +91,11 @@
     \textbf{Phase 0 --- PDF Parsing} \\[2pt]
     {\footnotesize PyPDF2 extraction\; $\to$\; regex detects ``REFERENCES'' heading\; $\to$\; split by \texttt{[N]} / \texttt{[Author,Year]}\; $\to$\; Unicode quote matching\; $\to$\; truncation (200K chars, 40 claims max)}
 
-    \vspace{0.3cm}
+    \vspace{0.15cm}
     \textbf{Phase 1 --- Claim Verification} \\[2pt]
     {\footnotesize 3-tier fallback: (1) Semantic Scholar, (2) arXiv Title API, (3) Crossref DOI search. Output: verdict + confidence + evidence snippet.}
 
-    \vspace{0.3cm}
+    \vspace{0.15cm}
     \textbf{Phase 2 --- Batch Scoring (B)} \\[2pt]
     {\footnotesize
     \begin{tabular}{ll}
@@ -122,19 +108,19 @@
 
     \column{0.48\textwidth}
     \textbf{Phase 3 --- Render (B)} \\[2pt]
-    {\footnotesize Markdown summary table (RYG counts), per-claim detail cards (verdict + confidence + snippet), Evidence Chain table (E00X $\to$ C00X).}
+    {\footnotesize Markdown: summary table, per-claim cards, Evidence Chain table (E00X $\to$ C00X).}
 
-    \vspace{0.3cm}
+    \vspace{0.12cm}
     \textbf{Phase 4 --- Persist (C)} \\[2pt]
-    {\footnotesize \texttt{artifact\_\_record} $\to$ evidence\_store, \texttt{memory\_\_write} $\to$ ``episodes'' kind.}
+    {\footnotesize \texttt{artifact\_\_record} $\to$ store, \texttt{memory\_\_write} $\to$ ``episodes''.}
 
-    \vspace{0.3cm}
+    \vspace{0.12cm}
     \textbf{Data Flow} \\[2pt]
     {\footnotesize Claim (C001) $\to$ VerificationResult $\to$ ScoredClaimResult $\to$ FactCheckResult}
 
-    \vspace{0.3cm}
+    \vspace{0.12cm}
     \textbf{Enforcement} \\[2pt]
-    {\footnotesize L1 (SKILL.md): 5-State Machine with exit checks. L2 (builder.py): HARD STOP RULE.}
+    {\footnotesize L1: 5-State Machine (SKILL.md). L2: HARD STOP RULE (builder.py).}
   \end{columns}
 \end{frame}
 
