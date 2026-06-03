@@ -184,7 +184,7 @@
     \begin{itemize}
       \footnotesize
       \item Scans report for evidence ID patterns (E, E-img, E-pdf)
-      \item Cross-checks cited IDs vs.\ \texttt{evidence\_store.json}
+      \item Cross-checks cited IDs vs.\ \texttt{evidence\_store}
       \item Detects fake IDs, unused evidence, bare claims
       \item Outputs PASS or WARN verdict
     \end{itemize}
@@ -283,14 +283,15 @@
 % ═══════════════════ Slide 9 — Agent Compliance Journey ═══════════════════
 \begin{frame}{Agent Compliance Journey: From 0 to 36/36}
   \begin{center}
-    \begin{tabular}{llll}
+    \small
+    \begin{tabular}{lp{3cm}p{3cm}p{4.5cm}}
       \toprule
-      Iteration & Approach & Result & Lesson \\
+      Iter. & Approach & Result & Lesson \\
       \midrule
-      \textbf{v1} & SKILL.md suggests & 0/6 tools called & LLMs ignore ``please''\\
-      \textbf{v2} & SKILL.md MUST + code examples & 10/40 verify, 0 score, 0 render & Agent still cuts corners\\
-      \textbf{v3} & 5-State Machine + exit checks & Partial improvement & Exit checks help but bypassable\\
-      \textbf{v4} & \textbf{HARD STOP RULE} in builder.py & \textbf{36/36 compliance} & \textbf{Framework > Prompt}\\
+      v1 & SKILL.md suggests & 0/6 tools & LLMs ignore ``please''\\
+      v2 & MUST + code examples & 10/40 verify, 0 score & Agent still cuts corners\\
+      v3 & 5-State Machine + exits & Partial fix & Exits help but bypassable\\
+      v4 & \textbf{HARD STOP RULE} & \textbf{36/36} & \textbf{Framework > Prompt}\\
       \bottomrule
     \end{tabular}
   \end{center}
