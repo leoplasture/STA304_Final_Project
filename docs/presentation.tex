@@ -65,7 +65,7 @@
   \begin{block}{Pipeline Flow}
     \begin{center}
       \large
-      \textbf{Row 1 (Extraction)} \\[4pt]
+      \textbf{Row 1 (Extraction)}\\ 
       \texttt{QQ User}
       \;$\longrightarrow$\;
       \texttt{crossdisc\_idea (C)}
@@ -74,8 +74,8 @@
       \;$\longrightarrow$\;
       \texttt{verify\_claim $\times$N (A)}
 
-      \vspace{0.5cm}
-      \textbf{Row 2 (Scoring \& Output)} \\[4pt]
+      % \vspace{0.5cm}
+      \textbf{Row 2 (Scoring \& Output)}\\
       \texttt{score\_batch (B)}
       \;$\longrightarrow$\;
       \texttt{render\_report (B)}
@@ -86,12 +86,12 @@
     \end{center}
   \end{block}
 
-  \vspace{0.3cm}
+  % \vspace{0.3cm}
   \begin{block}{Three Roles}
     \begin{description}
-      \item[Person A --- Tool Layer] \texttt{claim\_extractor}, \texttt{semantic\_verifier} (PyPDF2, S2/arXiv/Crossref API), HARD STOP RULE in \texttt{builder.py}
-      \item[Person B --- Scoring Layer] \texttt{traffic\_light} (7-branch RYG), \texttt{render} (Markdown), MCP 5-tool registration, 6 Quest execution
-      \item[Person C --- Integration Layer] \texttt{crossdisc\_idea} 5-Phase Skill, QQ multi-modal evidence recording, daemon integration, memory schema
+      \item[Person A --- Tool Layer] \texttt{claim\_extractor}, \texttt{semantic\_verifier}, HARD STOP RULE
+      \item[Person B --- Scoring Layer] \texttt{traffic\_light} (7-branch RYG), \texttt{render}, MCP 5-tool registration, 6 Quest runs
+      \item[Person C --- Integration Layer] \texttt{crossdisc\_idea} 5-Phase, QQ evidence recording, daemon integration, memory schema
     \end{description}
   \end{block}
 \end{frame}
@@ -122,21 +122,19 @@
 
     \column{0.48\textwidth}
     \textbf{Phase 3 --- Render (B)} \\[2pt]
-    {\footnotesize Rendered Markdown with: summary table (RYG counts), per-claim detail cards (verdict + confidence + evidence snippet), Evidence Chain table (E00X $\to$ C00X mapping).}
+    {\footnotesize Markdown summary table (RYG counts), per-claim detail cards (verdict + confidence + snippet), Evidence Chain table (E00X $\to$ C00X).}
 
     \vspace{0.3cm}
     \textbf{Phase 4 --- Persist (C)} \\[2pt]
-    {\footnotesize \texttt{artifact\_\_record} $\to$ evidence\_store \quad \texttt{memory\_\_write} $\to$ ``episodes'' kind.}
+    {\footnotesize \texttt{artifact\_\_record} $\to$ evidence\_store, \texttt{memory\_\_write} $\to$ ``episodes'' kind.}
 
     \vspace{0.3cm}
     \textbf{Data Flow} \\[2pt]
     {\footnotesize Claim (C001) $\to$ VerificationResult $\to$ ScoredClaimResult $\to$ FactCheckResult}
 
     \vspace{0.3cm}
-    \textbf{Enforcement --- Dual-Layer} \\[2pt]
-    {\footnotesize
-    Layer 1 (SKILL.md): 5-State Machine (Score$\to$Render$\to$Record$\to$Memory$\to$Deliver), each with exit checks.\\[2pt]
-    Layer 2 (builder.py): HARD STOP RULE --- all mandatory tool calls must complete before answer finalization.}
+    \textbf{Enforcement} \\[2pt]
+    {\footnotesize L1 (SKILL.md): 5-State Machine with exit checks. L2 (builder.py): HARD STOP RULE.}
   \end{columns}
 \end{frame}
 
@@ -145,49 +143,49 @@
 % ════════════════════════════════════════════════════════════════
 \begin{frame}{Evidence Chain \& Audit}
   \begin{columns}[T]
-    \column{0.45\textwidth}
+    \column{0.42\textwidth}
     \textbf{3 Evidence Entry Types}
     \begin{table}[h]
-      \small
+      \footnotesize
       \begin{tabular}{lll}
         \toprule
         Type & ID & Metadata \\
         \midrule
         QQ Text & E001 & text + SHA256 \\
-        QQ Image & E001-img & dimensions + SHA256 \\
-        QQ PDF & E001-pdf & pages + SHA256 + full-text \\
+        QQ Image & E001-img & dims + SHA256 \\
+        QQ PDF & E001-pdf & pages + SHA256 \\
         \bottomrule
       \end{tabular}
     \end{table}
 
-    \vspace{0.2cm}
+    \vspace{0.1cm}
     \textbf{Final Report Structure}
     \begin{itemize}
-      \footnotesize
-      \item §1 FactCheck Results (rendered RYG table)
-      \item §2 Evidence Chain Table (E00X $\leftrightarrow$ C00X, 40 rows)
-      \item §3--5 Cross-discipline bridges + hypothesis
-      \item §6 Caveats (verifier limits, hedging language)
+      \scriptsize
+      \item §1 FactCheck Results (RYG table)
+      \item §2 Evidence Chain Table (E--C mapping)
+      \item §3--5 Cross-discipline bridges
+      \item §6 Caveats (verifier limits)
     \end{itemize}
 
     \column{0.55\textwidth}
     \textbf{Audit: \texttt{audit\_report()}}
     \begin{itemize}
       \footnotesize
-      \item Scans report for \texttt{[E001]}, \texttt{[E001-img]}, \texttt{[E001-pdf]} patterns
-      \item Cross-references every cited ID against \texttt{evidence\_store.json}
-      \item Detects: fake IDs, unused evidence, bare claims (no annotation)
-      \item Counts: supported / inferred / unverified claims
+      \item Scans report for evidence ID patterns
+      \item Cross-checks cited IDs vs.\ \texttt{evidence\_store.json}
+      \item Detects fake IDs, unused evidence, bare claims
+      \item Counts supported / inferred / unverified
       \item Outputs PASS or WARN verdict
     \end{itemize}
 
-    \vspace{0.2cm}
+    \vspace{0.1cm}
     \textbf{Three-Tier Annotation}
     \begin{description}
       \footnotesize
-      \item[\texttt{[E001]}] Evidence-supported claim ($\textcolor{greenRYG}{\bullet}$ green)
-      \item[Inferred] Logically inferred, not directly proven
-      \item[Needs Verification] Insufficient evidence, needs further check
+      \item[\texttt{[E001]}] Evidence-supported ($\textcolor{greenRYG}{\bullet}$)
+      \item[Inferred] Logically inferred
+      \item[Needs Verif.] Insufficient evidence
     \end{description}
   \end{columns}
 \end{frame}
@@ -215,7 +213,7 @@
   \begin{block}{Key Metrics}
     \small
     \centering
-    \textbf{139 tests} all passing \quad | \quad \textbf{996 events} \quad | \quad \textbf{323 verify\_claim} calls \quad | \quad \textbf{36/36} mandatory tools
+    \textbf{139 tests} all pass \;|\; \textbf{996 events} \;|\; \textbf{323 verify\_claim} calls \;|\; \textbf{36/36} mandatory tools
   \end{block}
 \end{frame}
 
