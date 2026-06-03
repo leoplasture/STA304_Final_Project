@@ -65,18 +65,24 @@
   \begin{block}{Pipeline Flow}
     \begin{center}
       \large
-      \textbf{QQ User} \quad $\longrightarrow$ \quad
-      \textbf{crossdisc\_idea (C)} \quad $\longrightarrow$ \quad
-      \textbf{parse\_pdf (A)} \quad $\longrightarrow$ \quad
-      \textbf{verify\_claim $\times$N (A)}
+      \textbf{Row 1 (Extraction)} \\[4pt]
+      \texttt{QQ User}
+      \;$\longrightarrow$\;
+      \texttt{crossdisc\_idea (C)}
+      \;$\longrightarrow$\;
+      \texttt{parse\_pdf (A)}
+      \;$\longrightarrow$\;
+      \texttt{verify\_claim $\times$N (A)}
 
-      \vspace{0.4cm}
-      \quad\; $\downarrow$ \quad\; \\[0.2cm]
-
-      \textbf{QQ Returns} \quad $\longleftarrow$ \quad
-      \textbf{record + memory (C)} \quad $\longleftarrow$ \quad
-      \textbf{render\_report (B)} \quad $\longleftarrow$ \quad
-      \textbf{score\_batch (B)}
+      \vspace{0.5cm}
+      \textbf{Row 2 (Scoring \& Output)} \\[4pt]
+      \texttt{score\_batch (B)}
+      \;$\longrightarrow$\;
+      \texttt{render\_report (B)}
+      \;$\longrightarrow$\;
+      \texttt{artifact\_record + memory\_write (C)}
+      \;$\longrightarrow$\;
+      \texttt{QQ Returns RYG Report}
     \end{center}
   \end{block}
 
