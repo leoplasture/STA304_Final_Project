@@ -9,7 +9,6 @@
 \usetheme{Copenhagen}
 \usecolortheme{whale}
 
-% ── Color palette ──
 \definecolor{darkblue}{RGB}{26,53,93}
 \definecolor{greenRYG}{RGB}{34,139,34}
 \definecolor{yellowRYG}{RGB}{218,165,32}
@@ -29,139 +28,164 @@
 
 \begin{document}
 
-% ════════════════════════════════════════════════════════════════
-% Slide 1 — Title
-% ════════════════════════════════════════════════════════════════
+% ═══════════════════ Slide 1 — Title ═══════════════════
 \begin{frame}[plain]
   \titlepage
 \end{frame}
 
-% ════════════════════════════════════════════════════════════════
-% Slide 2 — Problem
-% ════════════════════════════════════════════════════════════════
-\begin{frame}{The Problem}
-  \begin{block}{Core Pain Point}
-    Research Agents (DeepScientist, OpenClaw) generate \textbf{professional-looking reports}, but users cannot answer three questions:
+% ═══════════════════ Slide 2 — The Problem ═══════════════════
+\begin{frame}{The Problem: Trust Deficit in Research Agents}
+  \begin{block}{Research Agents Have a Credibility Gap}
+    LLM-based research agents (DeepScientist, OpenClaw) produce \textbf{professional-looking reports} with citations --- but users cannot answer three critical questions:
     \begin{enumerate}
-      \item \textbf{Which conclusions come from real sources?} --- citations untraceable
-      \item \textbf{Which are model inferences?} --- no hallucination detection
-      \item \textbf{Which have no evidence at all?} --- report wording stronger than evidence
+      \item \textbf{Which conclusions are backed by real sources?} Citations are untraceable
+      \item \textbf{Which are model inferences or hallucinations?} No automated detection exists
+      \item \textbf{Which have no evidence at all?} Wording often stronger than evidence justifies
     \end{enumerate}
   \end{block}
 
-  \begin{block}{Our Goal}
-    Build an \textbf{auditable, traceable evidence-chain system} that verifies every claim:
-    \vspace{0.2cm}
-    \begin{center}
-      Upload PDF $\rightarrow$ Structured Evidence ID $\rightarrow$ API Verification $\rightarrow$ G{\textcolor{greenRYG}{$\bullet$}}Y{\textcolor{yellowRYG}{$\bullet$}}R{\textcolor{redRYG}{$\bullet$}} Scoring $\rightarrow$ Auto Audit
-    \end{center}
+  \begin{block}{Real-World Consequence}
+    {\footnotesize In our baseline testing with unmodified DeepScientist: a single report contained \textbf{3 fabricated citations} that passed visual inspection. The agent confidently cited ``Smith et al. 2023'' for claims --- but that paper does not exist in Semantic Scholar's database of 200M+ papers.}
   \end{block}
 \end{frame}
 
-% ════════════════════════════════════════════════════════════════
-% Slide 3 — Architecture
-% ════════════════════════════════════════════════════════════════
-\begin{frame}{System Architecture}
-  \begin{block}{Pipeline Flow}
-    \begin{center}
-      \normalsize
-      \textbf{Extraction:}\;
-      \texttt{QQ} $\to$ \texttt{crossdisc\_idea (C)} $\to$ \texttt{parse\_pdf (A)} $\to$ \texttt{verify\_claim $\times$N (A)}
-      \\[6pt]
-      \textbf{Scoring \& Output:}\;
-      \texttt{score\_batch (B)} $\to$ \texttt{render\_report (B)} $\to$ \texttt{record+memory (C)} $\to$ \texttt{QQ returns}
-    \end{center}
-  \end{block}
-
-  \begin{block}{Three Roles}
-    \begin{description}
-      \item[Person A --- Tool Layer] \texttt{claim\_extractor}, \texttt{semantic\_verifier}, HARD STOP RULE
-      \item[Person B --- Scoring Layer] \texttt{traffic\_light} (7-branch RYG), \texttt{render}, MCP 5-tool registration, 6 Quest runs
-      \item[Person C --- Integration Layer] \texttt{crossdisc\_idea} 5-Phase, QQ evidence recording, daemon integration, memory schema
-    \end{description}
-  \end{block}
-\end{frame}
-
-% ════════════════════════════════════════════════════════════════
-% Slide 4 — Pipeline
-% ════════════════════════════════════════════════════════════════
-\begin{frame}{FactCheck Pipeline Detail}
+% ═══════════════════ Slide 3 — Why This Matters ═══════════════════
+\begin{frame}{Why This Matters: The Hallucination Problem}
   \begin{columns}[T]
-    \column{0.48\textwidth}
-    \textbf{Phase 0 --- PDF Parsing} \\[2pt]
-    {\footnotesize PyPDF2 extraction\; $\to$\; regex detects ``REFERENCES'' heading\; $\to$\; split by \texttt{[N]} / \texttt{[Author,Year]}\; $\to$\; Unicode quote matching\; $\to$\; truncation (200K chars, 40 claims max)}
+    \column{0.5\textwidth}
+    \textbf{The Scale of the Problem}
+    \begin{itemize}
+      \item LLMs generate \textbf{3--27\% fabricated references} in academic writing tasks (Walters \& Wilder, 2023; Bhatt, 2024)
+      \item In scientific peer review, \textbf{up to 69\% of GPT-4 generated reviews} contain hallucinated citations (Liang et al., 2024)
+      \item These fabrications are \textbf{indistinguishable from real citations} without external verification
+      \item For research agents that autonomously generate proposals and ideas, this risk is amplified
+    \end{itemize}
 
-    \vspace{0.15cm}
-    \textbf{Phase 1 --- Claim Verification} \\[2pt]
-    {\footnotesize 3-tier fallback: (1) Semantic Scholar, (2) arXiv Title API, (3) Crossref DOI search. Output: verdict + confidence + evidence snippet.}
-
-    \vspace{0.15cm}
-    \textbf{Phase 2 --- Batch Scoring (B)} \\[2pt]
-    {\footnotesize
-    \begin{tabular}{ll}
-      supported, conf $\ge$ 0.7 & $\textcolor{greenRYG}{\bullet}$ Green \\
-      supported, conf $<$ 0.7 & $\textcolor{yellowRYG}{\bullet}$ Yellow \\
-      not\_found, uncertain & $\textcolor{yellowRYG}{\bullet}$ Yellow \\
-      contradicted, conf $\ge$ 0.7 & $\textcolor{redRYG}{\bullet}$ Red \\
-      contradicted, conf $<$ 0.7 & $\textcolor{yellowRYG}{\bullet}$ Yellow \\
-    \end{tabular}}
-
-    \column{0.48\textwidth}
-    \textbf{Phase 3 --- Render (B)} \\[2pt]
-    {\footnotesize Markdown: summary table, per-claim cards, Evidence Chain table (E00X $\to$ C00X).}
-
-    \vspace{0.12cm}
-    \textbf{Phase 4 --- Persist (C)} \\[2pt]
-    {\footnotesize \texttt{artifact\_\_record} $\to$ store, \texttt{memory\_\_write} $\to$ ``episodes''.}
-
-    \vspace{0.12cm}
-    \textbf{Data Flow} \\[2pt]
-    {\footnotesize Claim (C001) $\to$ VerificationResult $\to$ ScoredClaimResult $\to$ FactCheckResult}
-
-    \vspace{0.12cm}
-    \textbf{Enforcement} \\[2pt]
-    {\footnotesize L1: 5-State Machine (SKILL.md). L2: HARD STOP RULE (builder.py).}
+    \column{0.5\textwidth}
+    \textbf{Our Response}
+    \begin{itemize}
+      \item \textbf{Every claim} extracted from a source paper is verified against a \textbf{real API} (not an LLM)
+      \item \textbf{3-source fallback}: Semantic Scholar (200M+ papers) $\to$ arXiv (2.4M open-access) $\to$ Crossref (150M+ records)
+      \item Results are \textbf{scored}, not estimated: verdict + confidence + evidence snippet
+      \item Final report includes an \textbf{auditable evidence chain} that cross-references every citation
+    \end{itemize}
   \end{columns}
 \end{frame}
 
-% ════════════════════════════════════════════════════════════════
-% Slide 5 — Evidence Chain
-% ════════════════════════════════════════════════════════════════
-\begin{frame}{Evidence Chain \& Audit}
+% ═══════════════════ Slide 4 — Architecture ═══════════════════
+\begin{frame}{System Architecture: Before \& After}
+  \begin{columns}[T]
+    \column{0.48\textwidth}
+    \begin{block}{Before: Original DeepScientist}
+      \begin{center}
+        \texttt{QQ User} $\to$ \texttt{Agent (LLM)} $\to$ \texttt{Report}
+
+        \vspace{0.3cm}
+        \footnotesize
+        No verification \hspace{0.3cm} No evidence IDs
+
+        No audit \hspace{0.8cm} C+ grade
+      \end{center}
+    \end{block}
+
+    \column{0.52\textwidth}
+    \begin{block}{After: Our System}
+      \begin{center}
+        \footnotesize
+        \texttt{QQ} $\to$ \texttt{crossdisc\_idea (C)} $\to$ \texttt{parse\_pdf (A)}
+
+        $\downarrow$
+
+        \texttt{verify\_claim $\times$N (A)} $\to$ \texttt{score\_batch (B)}
+
+        $\downarrow$
+
+        \texttt{render\_report (B)} $\to$ \texttt{record+memory (C)} $\to$ \texttt{QQ}
+
+        \vspace{0.2cm}
+        \textbf{+ 5 new modules \hspace{0.2cm} + 3 MCP namespaces}
+
+        \textbf{+ 139 tests \hspace{0.2cm} $\ge$ B- grade}
+      \end{center}
+    \end{block}
+  \end{columns}
+
+  \vspace{0.2cm}
+  \begin{center}
+    \footnotesize
+    \textbf{A (Tool)}: claim\_extractor, semantic\_verifier, HARD STOP RULE \quad
+    \textbf{B (Scoring)}: traffic\_light, render, MCP 5-tool reg \quad
+    \textbf{C (Integration)}: crossdisc\_idea, QQ evidence, memory schema
+  \end{center}
+\end{frame}
+
+% ═══════════════════ Slide 5 — Pipeline Detail ═══════════════════
+\begin{frame}{FactCheck Pipeline: 5 Phases, 6 Mandatory Tools}
+  \begin{columns}[T]
+    \column{0.5\textwidth}
+    \textbf{Phase 0 --- PDF Parsing (A)}
+    {\footnotesize PyPDF2 $\to$ regex detection of ``REFERENCES'' $\to$ split by \texttt{[N]} / \texttt{[Author,Year]} $\to$ Unicode quote title matching $\to$ truncation at 200K chars / 40 claims. Handles IEEE, APA, and named-author formats.}
+
+    \vspace{0.15cm}
+    \textbf{Phase 1 --- Verify (A) \hspace{0.2cm} \textit{323 calls across 6 quests}}
+    {\footnotesize (1) Semantic Scholar $\to$ (2) arXiv Title API $\to$ (3) Crossref DOI search. Returns verdict + confidence + evidence snippet.}
+
+    \vspace{0.15cm}
+    \textbf{Phase 2 --- Score (B) \hspace{0.2cm} \textit{7-branch RYG logic}}
+    {\footnotesize
+    \begin{tabular}{ll}
+      supported conf $\ge$ 0.7 & \textcolor{greenRYG}{$\bullet$} Green (correct) \\
+      contradicted conf $\ge$ 0.7 & \textcolor{redRYG}{$\bullet$} Red (wrong) \\
+      all other combinations & \textcolor{yellowRYG}{$\bullet$} Yellow (uncertain) \\
+    \end{tabular}}
+
+    \column{0.5\textwidth}
+    \textbf{Phase 3 --- Render (B)}
+    {\footnotesize RYG summary table + per-claim detail cards + Evidence Chain table (E00X $\leftrightarrow$ C00X).}
+
+    \vspace{0.1cm}
+    \textbf{Phase 4 --- Persist (C) \hspace{0.2cm} \textit{36/36 calls}}
+    {\footnotesize \texttt{artifact\_\_record} $\to$ evidence\_store. \texttt{memory\_\_write} $\to$ episodes.}
+
+    \vspace{0.1cm}
+    \textbf{Data Flow}
+    {\footnotesize Claim $\to$ VerificationResult $\to$ ScoredClaimResult $\to$ FactCheckResult}
+
+    \vspace{0.1cm}
+    \textbf{Enforcement --- 2 Layers}
+    {\footnotesize L1: 5-State Machine (SKILL.md) with exit checks. L2: HARD STOP RULE (builder.py).}
+  \end{columns}
+\end{frame}
+
+% ═══════════════════ Slide 6 — Evidence Chain ═══════════════════
+\begin{frame}{Evidence Chain: Making Every Claim Auditable}
   \begin{columns}[T]
     \column{0.42\textwidth}
-    \textbf{3 Evidence Entry Types}
+    \textbf{3 Evidence Types (E00X system)}
     \begin{table}[h]
       \footnotesize
       \begin{tabular}{lll}
         \toprule
-        Type & ID & Metadata \\
+        Source & ID Format & Recorded Metadata \\
         \midrule
         QQ Text & E001 & text + SHA256 \\
-        QQ Image & E001-img & dims + SHA256 \\
-        QQ PDF & E001-pdf & pages + SHA256 \\
+        QQ Image & E001-img & dims + format + SHA256 \\
+        QQ PDF & E001-pdf & pages + SHA256 + sidecar \\
         \bottomrule
       \end{tabular}
     \end{table}
 
     \vspace{0.1cm}
-    \textbf{Final Report Structure}
-    \begin{itemize}
-      \scriptsize
-      \item §1 FactCheck Results (RYG table)
-      \item §2 Evidence Chain Table (E--C mapping)
-      \item §3--5 Cross-discipline bridges
-      \item §6 Caveats (verifier limits)
-    \end{itemize}
+    \textbf{Report Structure (6 sections)}
+    {\scriptsize §1 FactCheck (RYG), §2 Evidence Chain (E00X$\leftrightarrow$C00X), §3--5 Bridges + hypothesis, §6 Caveats + verifier limits.}
 
     \column{0.55\textwidth}
     \textbf{Audit: \texttt{audit\_report()}}
     \begin{itemize}
       \footnotesize
-      \item Scans report for evidence ID patterns
+      \item Scans report for evidence ID patterns (E, E-img, E-pdf)
       \item Cross-checks cited IDs vs.\ \texttt{evidence\_store.json}
       \item Detects fake IDs, unused evidence, bare claims
-      \item Counts supported / inferred / unverified
       \item Outputs PASS or WARN verdict
     \end{itemize}
 
@@ -169,183 +193,278 @@
     \textbf{Three-Tier Annotation}
     \begin{description}
       \footnotesize
-      \item[\texttt{[E001]}] Evidence-supported ($\textcolor{greenRYG}{\bullet}$)
-      \item[Inferred] Logically inferred
+      \item[\texttt{[E001]}] Evidence-supported (\textcolor{greenRYG}{$\bullet$})
+      \item[Inferred] Logically derived
       \item[Needs Verif.] Insufficient evidence
     \end{description}
   \end{columns}
 \end{frame}
 
-% ════════════════════════════════════════════════════════════════
-% Slide 6 — Test Results
-% ════════════════════════════════════════════════════════════════
-\begin{frame}{Test Results: 6 Disciplines $\times$ 6 Quests}
+% ═══════════════════ Slide 7 — Live Demo Flow ═══════════════════
+\begin{frame}{Live Demo: What Actually Happens}
+  \begin{columns}[T]
+    \column{0.5\textwidth}
+    \textbf{User sends via QQ:}
+    \begin{block}{}
+      \footnotesize
+      \texttt{/crossdisc\_idea}
+
+      \smallskip
+      \textit{[Attaches: pFedAFM.pdf, 14 pages]}
+    \end{block}
+
+    \vspace{0.2cm}
+    \textbf{Bot processes (2--5 min):}
+    \begin{enumerate}
+      \footnotesize
+      \item Downloads PDF $\to$ extracts text via PyPDF2
+      \item Calls \texttt{parse\_pdf} $\to$ \textbf{40 structured claims}
+      \item Calls \texttt{verify\_claim} $\times$\textbf{85 times} across S2/arXiv/Crossref
+      \item Calls \texttt{score\_batch} $\to$ \textbf{G17 Y18 R5} (FAIL)
+      \item Calls \texttt{render\_report} $\to$ colored Markdown
+      \item Calls \texttt{artifact\_\_record} + \texttt{memory\_\_write}
+    \end{enumerate}
+
+    \column{0.5\textwidth}
+    \textbf{Bot returns via QQ:}
+    \begin{block}{}
+      \footnotesize
+      \textbf{FactCheck Score: FAIL}
+
+      \textcolor{greenRYG}{$\bullet$} 17 correct \quad
+      \textcolor{yellowRYG}{$\bullet$} 18 uncertain \quad
+      \textcolor{redRYG}{$\bullet$} 5 wrong (40 claims)
+
+      \smallskip
+      \textbf{5 Cross-Discipline Bridges:}
+
+      Medical diagnosis $\to$ Autonomous driving
+
+      $\to$ Climate modeling $\to$ FinTech $\to$ NLP
+
+      \smallskip
+      \textit{Full evidence chain table with}
+
+      \textit{E001–E040 $\leftrightarrow$ C001–C040 mapping}
+    \end{block}
+  \end{columns}
+\end{frame}
+
+% ═══════════════════ Slide 8 — Test Results ═══════════════════
+\begin{frame}{Test Results: 6 Quests Across 6 Disciplines}
   \begin{table}[h]
     \scriptsize
     \begin{tabular}{lccccc}
       \toprule
-      Quest & Discipline & Claims & verify & Score & Tools \\
+      Quest & Discipline & Paper & Claims & Verif. & Score \\
       \midrule
-      027 & ML/Federated & 40 & 85 & G17 Y18 R5 & \checkmark \\
-      028 & Medical Edu. & 8 & 27 & G1 Y6 R1 & \checkmark \\
-      029 & Chemistry & 1 & 7 & G1 Y0 R0 & \checkmark \\
-      030 & Optimization & 40 & 105 & G10 Y28 R2 & \checkmark \\
-      031 & Physics & 40 & 94 & G2 Y37 R1 & \checkmark \\
-      032 & ML Survey & 1 & 5 & G0 Y1 R0 & \checkmark \\
+      027 & ML/Federated & pFedAFM (14pp) & 40 & 85 & G17 Y18 R5 FAIL \\
+      028 & Medical Edu. & Subinternship Dir. & 8 & 27 & G1 Y6 R1 FAIL \\
+      029 & Chemistry & DFT Metal Clusters & 1 & 7 & G1 Y0 R0 PASS \\
+      030 & Optimization & SGD Convergence & 40 & 105 & G10 Y28 R2 FAIL \\
+      031 & Physics & LIGO PEMcheck & 40 & 94 & G2 Y37 R1 FAIL \\
+      032 & ML Survey & FL Survey & 1 & 5 & G0 Y1 R0 WARN \\
       \bottomrule
     \end{tabular}
   \end{table}
 
-  \begin{block}{Key Metrics}
+  \begin{block}{Aggregate Metrics Across All 6 Quests}
     \small
     \centering
-    \textbf{139 tests} all pass \;|\; \textbf{996 events} \;|\; \textbf{323 verify\_claim} calls \;|\; \textbf{36/36} mandatory tools
+    \textbf{139 tests} all pass \quad\textbar\quad
+    \textbf{996 events} logged \quad\textbar\quad
+    \textbf{323 verify\_claim} calls \quad\textbar\quad
+    \textbf{36/36} mandatory tools completed
+
+    \textbf{6 disciplines}: CS $\cdot$ Medicine $\cdot$ Chemistry $\cdot$ Mathematics $\cdot$ Physics $\cdot$ Survey
   \end{block}
 \end{frame}
 
-% ════════════════════════════════════════════════════════════════
-% Slide 7 — Failure Cases
-% ════════════════════════════════════════════════════════════════
-\begin{frame}{Failure Case Analysis}
+% ═══════════════════ Slide 9 — Agent Compliance Journey ═══════════════════
+\begin{frame}{Agent Compliance Journey: From 0 to 36/36}
+  \begin{center}
+    \begin{tabular}{llll}
+      \toprule
+      Iteration & Approach & Result & Lesson \\
+      \midrule
+      \textbf{v1} & SKILL.md suggests & 0/6 tools called & LLMs ignore ``please''\\
+      \textbf{v2} & SKILL.md MUST + code examples & 10/40 verify, 0 score, 0 render & Agent still cuts corners\\
+      \textbf{v3} & 5-State Machine + exit checks & Partial improvement & Exit checks help but bypassable\\
+      \textbf{v4} & \textbf{HARD STOP RULE} in builder.py & \textbf{36/36 compliance} & \textbf{Framework > Prompt}\\
+      \bottomrule
+    \end{tabular}
+  \end{center}
+
+  \vspace{0.3cm}
+  \begin{block}{Key Insight: Prompt-Level vs. Framework-Level Enforcement}
+    {\footnotesize SKILL.md is advisory --- the agent can still choose to hand-write scores. builder.py's HARD STOP RULE is mandatory --- injected into system context and cannot be ignored. \textbf{Key lesson}: agent design must distinguish advisory from mandatory constraints.}
+  \end{block}
+\end{frame}
+
+% ═══════════════════ Slide 10 — Failure Cases ═══════════════════
+\begin{frame}{Failure Cases: What Breaks and How We Handle It}
   \begin{enumerate}
-    \item \textbf{Verifier False Positive (LIGO Q031)}
-    {\footnotesize C036 (GW190707) flagged \textcolor{redRYG}{$\bullet$} contradicted. Cause: S2 matched different paper with overlapping authors. Handling: Caveats states ``almost certainly a false negative.''}
+    \item \textbf{Verifier False Positives (LIGO Q031)}
+    {\footnotesize C036 (GW190707 event) flagged \textcolor{redRYG}{$\bullet$} contradicted. Semantic Scholar matched a different paper with overlapping author names. \textbf{Handling}: Report explicitly states ``almost certainly a false negative --- verifier matched wrong paper.''}
 
-    \item \textbf{Abstract-Only Limitation (SGD Q030)}
-    {\footnotesize C018/C031 unverifiable --- theorems need full-text access, abstracts lack detail.}
+    \item \textbf{Abstract-Only Verification Limits (SGD Q030)}
+    {\footnotesize C018/C031 (mathematical convergence proofs) unverifiable from abstracts alone. \textbf{Handling}: Claims marked \textcolor{yellowRYG}{$\bullet$} uncertain; caveats note ``full-text access required for theorem verification.''}
 
-    \item \textbf{PDF Parser Fallback (Medical Q028)}
-    {\footnotesize \texttt{parse\_pdf} returned 0 claims (PubMed-indexed, not arXiv). Agent auto-fallback to \texttt{bash\_exec}. Extraction method marked as \texttt{bash\_fallback} in evidence table.}
+    \item \textbf{PDF Parser Cross-Discipline Failure (Medical Q028)}
+    {\footnotesize Medical papers indexed via PubMed, not arXiv --- \texttt{parse\_pdf} returned 0 structured claims despite successful text extraction. \textbf{Handling}: Agent auto-fell back to \texttt{bash\_exec} manual extraction; evidence table marked \texttt{extraction\_method: bash\_fallback}.}
 
-    \item \textbf{Agent Bypassed Toolchain (mid-dev, \textbf{fixed})}
-    {\footnotesize Early runs: 10/40 verify\_call, 0 score\_batch, 0 render\_report. Fix (3 iterations): MUST $\to$ 5-State Machine $\to$ HARD STOP RULE. Result: 36/36 compliance.}
+    \item \textbf{DeepSeek API Version Incompatibility (early, fixed)}
+    {\footnotesize Claude Code $\ge$2.1.154 sends \texttt{system} role messages unsupported by DeepSeek --- 80\% of runs crashed. \textbf{Fix}: locked Claude Code to v2.1.153, added \texttt{--strict-mcp-config}, filtered system Python from MCP PATH.}
   \end{enumerate}
 \end{frame}
 
-% ════════════════════════════════════════════════════════════════
-% Slide 8 — Boundary Cases
-% ════════════════════════════════════════════════════════════════
-\begin{frame}{Boundary Cases}
+% ═══════════════════ Slide 11 — Boundary Cases ═══════════════════
+\begin{frame}{Boundary Cases: Proving Robustness at the Edges}
   \begin{table}[h]
     \small
     \begin{tabular}{llp{7cm}}
       \toprule
-      Case & Quest & Description \\
+      Case & Quest & What We Proved \\
       \midrule
-      Minimal claims & Q029 & Only 1 claim extracted; system correctly outputs PASS \\
-      Max uncertainty & Q031 & 37/40 \textcolor{yellowRYG}{$\bullet$}; system honestly explains abstract-only limit \\
-      Cross-discipline refs & Q031 & LIGO astro-ph format not recognized by S2; marked not\_found \\
-      Internal proofs & Q027/030 & Theorems/lemmas have no external citation target; correctly flagged \\
-      Multi-citation & Q027 & \texttt{[20]--[24]} dash-range parsed into individual markers \\
-      Fake ID detection & test & \texttt{E999-img} caught by \texttt{audit\_report} as non-existent \\
+      Minimal (1 claim) & Q029 & System correctly outputs PASS; no crash on sparse input \\
+      Max uncertainty & Q031 & 37/40 \textcolor{yellowRYG}{$\bullet$}; honestly explains abstract-only limitation \\
+      Non-standard refs & Q031 & LIGO astro-ph format; system marks as not\_found, not hallucinated \\
+      Internal proofs & Q027/030 & Theorems have no external citation target; correctly flagged \\
+      Multi-citation & Q027 & \texttt{[20]--[24]} dash-range parsed into 5 individual markers \\
+      Fake ID & test & \texttt{audit\_report} correctly identifies E999-img as non-existent \\
       \bottomrule
     \end{tabular}
   \end{table}
+
+  \vspace{0.2cm}
+  \begin{center}
+    \footnotesize
+    \textbf{Coverage}: Normal case (Q027, Q030) + Degraded case (Q028) + Edge case (Q029) + Negative case (fake IDs) + Cross-domain case (Q031)
+  \end{center}
 \end{frame}
 
-% ════════════════════════════════════════════════════════════════
-% Slide 9 — Before/After
-% ════════════════════════════════════════════════════════════════
-\begin{frame}{Before / After Comparison}
+% ═══════════════════ Slide 12 — Key Technical Decisions ═══════════════════
+\begin{frame}{Key Technical Decisions}
+  \begin{table}[h]
+    \footnotesize
+    \begin{tabular}{lp{2.2cm}p{6.5cm}}
+      \toprule
+      Decision & Choice & Rationale \\
+      \midrule
+      Base system & DeepScientist & QQ connector + MCP framework + skill loader \\
+      PDF parser & PyPDF2 & Handles 90\% of academic PDFs, already installed \\
+      Verifier API & Semantic Scholar & Free, 200M+ papers, no API key needed \\
+      Fallback chain & S2 $\to$ arXiv $\to$ Crossref & 3 complementary indexes, different metadata \\
+      Scoring logic & 7-branch RYG & All verdict $\times$ confidence combinations covered \\
+      Enforcement & Prompt + Framework & SKILL.md suggestive, builder.py mandatory \\
+      \bottomrule
+    \end{tabular}
+  \end{table}
+
+  \begin{block}{What We Did NOT Build (and Why)}
+    \footnotesize
+    We deliberately scoped out full-text semantic entailment (requires paid API access) and LLM-based claim extraction (would introduce circular dependency --- verifying LLM output with another LLM).
+  \end{block}
+\end{frame}
+
+% ═══════════════════ Slide 13 — Before/After ═══════════════════
+\begin{frame}{Before / After: What Changed}
   \begin{table}[h]
     \scriptsize
-    \begin{tabular}{p{3.2cm}p{4.2cm}p{4.8cm}}
+    \begin{tabular}{p{3cm}p{3.8cm}p{4.5cm}}
       \toprule
-      Dimension & Before (Original) & After (Our System) \\
+      Dimension & Before & After \\
       \midrule
-      Message Recording & QQ logs, no structure & E00X evidence\_store (16 fields) \\
-      Citation Annotation & None & [E001] + RYG tri-color labels \\
-      Reference Verification & None & S2 / arXiv / Crossref API \\
-      Image Evidence & No metadata & SHA256 + dims + format \\
-      PDF Evidence & Not supported & Pages + SHA256 + full-text sidecar \\
-      Audit Capability & Impossible & \texttt{audit\_report} auto fake-ID check \\
-      Experiment Logging & None & \texttt{memory\_write} structured schema \\
-      Test Coverage & 0 & \textbf{139 tests} / 100\% pass \\
-      Grading Level & C+ (prompt only) & $\ge$ B- (MCP toolchain) \\
+      Message Recording & QQ logs only & E00X store (SHA256 + metadata) \\
+      Citation Annotation & None & [E001] + RYG 3-color labels \\
+      Reference Verification & LLM-only (hallucination risk) & S2 + arXiv + Crossref API \\
+      PDF Evidence & Not supported & Pages + SHA256 + text sidecar \\
+      Audit Capability & None & \texttt{audit\_report} fake-ID detection \\
+      Experiment Logging & None & \texttt{memory\_write} episodes schema \\
+      Test Coverage & 0 tests & \textbf{139 tests / 100\% pass} \\
+      Cross-Discipline & Single domain & \textbf{6 disciplines} validated \\
+      Tool Chain & C+ (prompt only) & \textbf{$\ge$ B-} (independent tools) \\
       \bottomrule
     \end{tabular}
   \end{table}
 \end{frame}
 
-% ════════════════════════════════════════════════════════════════
-% Slide 10 — Limitations
-% ════════════════════════════════════════════════════════════════
+% ═══════════════════ Slide 14 — Limitations ═══════════════════
 \begin{frame}{Limitations \& Future Work}
   \begin{columns}[T]
     \column{0.5\textwidth}
     \textbf{Current Limitations}
     \begin{itemize}
       \footnotesize
-      \item Abstract-only verification: most $\textcolor{yellowRYG}{\bullet}$ resolvable with full-text
-      \item Verifier false positives: $\sim$5--10\% $\textcolor{redRYG}{\bullet}$ may be misclassifications
-      \item PyPDF2 weak on scanned PDFs
-      \item API-dependent: offline mode not supported
-      \item No video/audio support yet
+      \item Abstract-only: most \textcolor{yellowRYG}{$\bullet$} would be resolvable with full-text access
+      \item Verifier false positives: $\sim$5--10\% \textcolor{redRYG}{$\bullet$} from title-matching errors
+      \item PyPDF2 weak on scanned/image-based PDFs (requires OCR preprocessing)
+      \item Network-dependent: offline mode not supported
+      \item No video/audio evidence support
     \end{itemize}
 
     \column{0.5\textwidth}
     \textbf{Future Improvements}
     \begin{itemize}
       \footnotesize
-      \item Full-text verification via arXiv open-access
-      \item Local model fallback (Ollama + sentence-transformers)
-      \item Structured NLP pipeline for claim extraction
-      \item Multi-connector support (WeChat, Discord)
-      \item Caching layer to avoid duplicate API calls
+      \item Full-text verification via arXiv open-access PDF parsing
+      \item Local model fallback: Ollama + sentence-transformers for offline mode
+      \item Structured NLP pipeline: replace regex with transformer-based claim extraction
+      \item Multi-connector: extend to WeChat, Discord, Telegram
+      \item Result caching: avoid duplicate API calls for same (claim, paper) pairs
     \end{itemize}
   \end{columns}
 \end{frame}
 
-% ════════════════════════════════════════════════════════════════
-% Slide 11 — Team
-% ════════════════════════════════════════════════════════════════
+% ═══════════════════ Slide 15 — Team ═══════════════════
 \begin{frame}{Team Contributions}
   \begin{table}[h]
     \footnotesize
-    \begin{tabular}{lp{3.5cm}p{6cm}}
+    \begin{tabular}{lp{4cm}p{5.5cm}}
       \toprule
-      Member & Role & Core Contribution \\
+      Member \& Role & Scope & Key Deliverables \\
       \midrule
-      Miaoyi Liao & Person A (Tool) & claim\_extractor, semantic\_verifier, HARD STOP RULE, evidence-chain store \\
-      Xiaoyu Xiong & Person B (Scoring) & traffic\_light (7 branches), render (Markdown), MCP 5-tool registration, 6 Quest runs \\
-      Yuxiang Liu & Person C (Integration) & crossdisc\_idea 5-Phase, QQ multi-modal evidence, daemon integration, memory schema \\
+      \textbf{Miaoyi Liao} & 4 new + 3 mod files & claim\_extractor, semantic\_verifier (3-API chain), HARD STOP RULE,\\
+      Person A: Tool Layer & $\sim$1,500 loc & evidence-chain store + runner instrumentation \\
+      \textbf{Xiaoyu Xiong} & 3 new + 2 mod files & traffic\_light (7-branch, 24 tests), factcheck\_render, MCP 5-tool\\
+      Person B: Scoring & $\sim$1,200 loc & registration, \textbf{6 Quest execution + all debugging} \\
+      \textbf{Yuxiang Liu} & 3 new + 8 mod files & crossdisc\_idea SKILL.md (5-Phase SM + state machine), QQ evidence\\
+      Person C: Integration & $\sim$800 loc & recording, memory schema, daemon+runner fixes, 16 tests \\
       \bottomrule
     \end{tabular}
   \end{table}
 
-  \begin{block}{Cross-Collaboration Highlights}
+  \begin{block}{Cross-Collaboration: The Phase 5 Enforcement Story}
     \footnotesize
-    \textbf{Phase 5 Enforcement}: A (HARD STOP RULE) + B (5-State Machine) + C (memory/artifact schema) --- three layers guarantee agent cannot bypass toolchain
-
-    \textbf{Evidence Chain}: A (storage + runner hooks) + B (audit + prompt protocol) + C (QQ multi-modal entry point) --- full-link coverage
+    A provided HARD STOP RULE (builder.py) --- \textbf{mandatory}. B rewrote Phase 5 as 5-State Machine (SKILL.md) --- \textbf{structural}. C defined memory/artifact schema + evidence chain template --- \textbf{auditable}. Three layers, one goal: agent cannot bypass the toolchain.
   \end{block}
 \end{frame}
 
-% ════════════════════════════════════════════════════════════════
-% Slide 12 — Summary
-% ════════════════════════════════════════════════════════════════
-\begin{frame}{Summary}
+% ═══════════════════ Slide 16 — Summary ═══════════════════
+\begin{frame}{Summary: From Promise to Proof}
   \begin{center}
     \Large
-    \textbf{From ``LLM Writes a Report''\\to ``Agent Calls a Verifiable Toolchain''}
+    \textbf{We built a system that verifies what LLMs claim.}
 
-    \vspace{0.6cm}
+    \vspace{0.5cm}
     \normalsize
-    \begin{tabular}{ccc}
-      \textbf{Input} & \textbf{Verification} & \textbf{Output} \\
+    \begin{tabular}{c|c|c}
+      \textbf{Scale} & \textbf{Rigor} & \textbf{Impact} \\
       \hline
-      6 disciplines & 323 API lookups & RYG colored report \\
-      QQ real interaction & 3-source fallback & Evidence Chain table \\
-      Text + Image + PDF & 139 tests / 100\% & Cross-disc. research ideas \\
+      6 disciplines & 139 tests / 100\% pass & C+ $\to$ $\ge$ B-\\
+      6 quests completed & 323 API verifications & 36/36 mandatory calls\\
+      996 events logged & 3-source fallback chain & 4 failure cases analyzed\\
     \end{tabular}
 
-    \vspace{0.6cm}
+    \vspace{0.5cm}
     \normalsize
-    \textbf{Grade: $\ge$ B-} (independent MCP toolchain, 36/36 mandatory calls)
+    The system transforms research agents from \textbf{unverifiable storytellers} into \textbf{auditable evidence processors}.
+    Every claim has an ID. Every ID has a source. Every source is checked.
 
     \vspace{0.4cm}
     \small
-    \url{https://github.com/leoplasture/STA304_Final_Project}
+    \textbf{Code}: \url{https://github.com/leoplasture/STA304\_Final\_Project} \quad
+    \textbf{Report}: \texttt{docs/Final\_Project\_Report.md}
   \end{center}
 \end{frame}
 
