@@ -1,0 +1,435 @@
+\documentclass[aspectratio=169,11pt]{beamer}
+\usepackage{fontspec}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{tikz}
+\usepackage{xcolor}
+\usepackage{hyperref}
+
+\usetheme{Copenhagen}
+\usecolortheme{whale}
+
+% ── Color palette ──
+\definecolor{darkblue}{RGB}{26,53,93}
+\definecolor{greenRYG}{RGB}{34,139,34}
+\definecolor{yellowRYG}{RGB}{218,165,32}
+\definecolor{redRYG}{RGB}{220,38,38}
+\definecolor{lightgray}{RGB}{240,244,248}
+
+\setbeamercolor{title}{fg=white,bg=darkblue}
+\setbeamercolor{frametitle}{fg=white,bg=darkblue}
+\setbeamercolor{structure}{fg=darkblue}
+\setbeamercolor{block title}{fg=white,bg=darkblue}
+
+\title{Literature Citation Verification System\\Based on DeepScientist}
+\subtitle{Project A --- Engineering Track: Evidence Chain Module}
+\author[Group 09]{Miaoyi Liao \and Xiaoyu Xiong \and Yuxiang Liu}
+\institute[STA304]{STA304 Final Project · LLMs: From Principles to Applications}
+\date{June 2026}
+
+\begin{document}
+
+% ════════════════════════════════════════════════════════════════
+% Slide 1 — Title
+% ════════════════════════════════════════════════════════════════
+\begin{frame}[plain]
+  \titlepage
+\end{frame}
+
+% ════════════════════════════════════════════════════════════════
+% Slide 2 — Problem
+% ════════════════════════════════════════════════════════════════
+\begin{frame}{The Problem}
+  \begin{block}{Core Pain Point}
+    Research Agents (DeepScientist, OpenClaw) generate \textbf{professional-looking reports}, but users cannot answer three questions:
+    \begin{enumerate}
+      \item \textbf{Which conclusions come from real sources?} --- citations untraceable
+      \item \textbf{Which are model inferences?} --- no hallucination detection
+      \item \textbf{Which have no evidence at all?} --- report wording stronger than evidence
+    \end{enumerate}
+  \end{block}
+
+  \begin{block}{Our Goal}
+    Build an \textbf{auditable, traceable evidence-chain system} that verifies every claim:
+    \vspace{0.2cm}
+    \begin{center}
+      Upload PDF $\rightarrow$ Structured Evidence ID $\rightarrow$ API Verification $\rightarrow$ 🟢🟡🔴 Scoring $\rightarrow$ Auto Audit
+    \end{center}
+  \end{block}
+\end{frame}
+
+% ════════════════════════════════════════════════════════════════
+% Slide 3 — Architecture
+% ════════════════════════════════════════════════════════════════
+\begin{frame}{System Architecture}
+  \begin{center}
+    \begin{tikzpicture}[node distance=0.7cm, auto,
+      block/.style={rectangle, draw, fill=lightgray, text width=2.6cm, text centered, minimum height=0.9cm, font=\footnotesize},
+      mcp/.style={rectangle, draw, fill=greenRYG!10, text width=2.4cm, text centered, minimum height=0.7cm, font=\footnotesize},
+      arrow/.style={->, >=stealth, thick}]
+
+      \node[block] (qq) {QQ User\\Uploads PDF};
+      \node[block, right=of qq] (skill) {crossdisc\_idea\\Skill (Person C)};
+      \node[block, right=of skill] (parse) {parse\_pdf\\(PyPDF2, A)};
+      \node[block, right=of parse] (verify) {verify\_claim $\times N$\\(S2/arXiv/Crossref, A)};
+
+      \node[block, below=of parse] (score) {score\_batch\\$\textcolor{greenRYG}{\bullet}\textcolor{yellowRYG}{\bullet}\textcolor{redRYG}{\bullet}$ (B)};
+      \node[block, right=of score] (render) {render\_report\\Markdown table (B)};
+      \node[block, right=of render] (record) {artifact\_record +\\memory\_write (C)};
+
+      \draw[arrow] (qq) -- (skill);
+      \draw[arrow] (skill) -- (parse);
+      \draw[arrow] (parse) -- (verify);
+      \draw[arrow] (verify) -- (score);
+      \draw[arrow] (score) -- (render);
+      \draw[arrow] (render) -- (record);
+
+      \draw[arrow, bend right] (record.east) to (qq.south east);
+      \node[font=\footnotesize] at (9.2, -3.5) {QQ returns RYG report};
+    \end{tikzpicture}
+  \end{center}
+
+  \vspace{0.2cm}
+  \begin{columns}[T]
+    \column{0.33\textwidth}
+    \centering \textbf{A: Tool Layer}\\
+    \footnotesize claim\_extractor\\
+    \footnotesize semantic\_verifier\\
+    \footnotesize HARD STOP RULE
+    \column{0.33\textwidth}
+    \centering \textbf{B: Scoring Layer}\\
+    \footnotesize traffic\_light\\
+    \footnotesize render + MCP reg\\
+    \footnotesize 6 Quest execution
+    \column{0.33\textwidth}
+    \centering \textbf{C: Integration Layer}\\
+    \footnotesize crossdisc\_idea\\
+    \footnotesize QQ evidence recording\\
+    \footnotesize memory schema
+  \end{columns}
+\end{frame}
+
+% ════════════════════════════════════════════════════════════════
+% Slide 4 — Pipeline
+% ════════════════════════════════════════════════════════════════
+\begin{frame}{FactCheck Pipeline Detail}
+  \begin{columns}[T]
+    \column{0.5\textwidth}
+    \textbf{Phase 0 --- PDF Parsing}
+    \begin{itemize}
+      \footnotesize
+      \item PyPDF2 text extraction
+      \item Regex-based reference section detection
+      \item Split by \texttt{[N]} or \texttt{[Author,Year]} markers
+      \item Unicode quote matching for title extraction
+      \item Output truncation (200K chars / 40 claims max)
+    \end{itemize}
+
+    \textbf{Phase 1 --- Claim Verification $\times N$}
+    \begin{itemize}
+      \footnotesize
+      \item 3-tier fallback chain:
+      \item 1. Semantic Scholar (title+abstract)
+      \item 2. arXiv (Title API)
+      \item 3. Crossref (DOI/title search)
+      \item Output: verdict + confidence + evidence snippet
+    \end{itemize}
+
+    \column{0.5\textwidth}
+    \textbf{Phase 2 --- Batch Scoring (B)}
+    \begin{table}[h]
+      \tiny
+      \begin{tabular}{lll}
+        \toprule
+        Condition & Score & Signal \\
+        \midrule
+        supported + conf $\ge$ 0.7 & Green & $\textcolor{greenRYG}{\bullet}$ \\
+        supported + conf $<$ 0.7 & Yellow & $\textcolor{yellowRYG}{\bullet}$ \\
+        not\_found & Yellow & $\textcolor{yellowRYG}{\bullet}$ \\
+        contradicted + conf $\ge$ 0.7 & Red & $\textcolor{redRYG}{\bullet}$ \\
+        contradicted + conf $<$ 0.7 & Yellow & $\textcolor{yellowRYG}{\bullet}$ \\
+        \bottomrule
+      \end{tabular}
+    \end{table}
+
+    \textbf{Phase 3 --- Render (B)}
+    \begin{itemize}
+      \footnotesize
+      \item Summary table (RYG counts)
+      \item Per-claim detail cards
+      \item Evidence Chain table (E00X $\rightarrow$ C00X)
+    \end{itemize}
+
+    \textbf{Phase 4 --- Persist (C)}
+    \begin{itemize}
+      \footnotesize
+      \item artifact\_\_record $\rightarrow$ evidence\_store
+      \item memory\_\_write $\rightarrow$ ``episodes'' kind
+    \end{itemize}
+  \end{columns}
+\end{frame}
+
+% ════════════════════════════════════════════════════════════════
+% Slide 5 — Evidence Chain
+% ════════════════════════════════════════════════════════════════
+\begin{frame}{Evidence Chain \& Enforcement Contract}
+  \begin{columns}[T]
+    \column{0.45\textwidth}
+    \textbf{3 Evidence Entry Types}
+    \begin{table}[h]
+      \small
+      \begin{tabular}{lll}
+        \toprule
+        Type & ID & Metadata \\
+        \midrule
+        QQ Text & E001 & text + SHA256 \\
+        QQ Image & E001-img & dims + SHA256 \\
+        QQ PDF & E001-pdf & pages + SHA256 \\
+        \bottomrule
+      \end{tabular}
+    \end{table}
+
+    \vspace{0.2cm}
+    \textbf{Data Flow}
+    \begin{center}
+      \tiny
+      Claim (C001) $\rightarrow$ VerificationResult $\rightarrow$ ScoredClaimResult $\rightarrow$ FactCheckResult
+    \end{center}
+
+    \column{0.55\textwidth}
+    \textbf{Dual-Layer Enforcement --- Agent Cannot Bypass}
+    \begin{block}{Layer 1 --- SKILL.md State Machine}
+      \footnotesize
+      Score $\rightarrow$ Render $\rightarrow$ Record $\rightarrow$ Memory $\rightarrow$ Deliver
+
+      Each state has exit checks; $\geq$1 fail = retry current state
+    \end{block}
+
+    \begin{block}{Layer 2 --- HARD STOP RULE (builder.py)}
+      \footnotesize
+      \texttt{MUST call score\_batch exactly once. No manual scoring.}
+
+      \texttt{MUST call render\_report. No hand-written tables.}
+
+      \texttt{MUST call artifact\_\_record, confirm status = ok.}
+
+      \texttt{MUST call memory\_\_write after report generation.}
+
+      \texttt{HARD STOP: if any tool missing, continue execution.}
+    \end{block}
+  \end{columns}
+\end{frame}
+
+% ════════════════════════════════════════════════════════════════
+% Slide 6 — Test Results
+% ════════════════════════════════════════════════════════════════
+\begin{frame}{Test Results: 6 Disciplines $\times$ 6 Quests}
+  \begin{table}[h]
+    \small
+    \begin{tabular}{lcccccc}
+      \toprule
+      Quest & Discipline & Paper Topic & Claims & verify & Score & Tools \\
+      \midrule
+      027 & ML/Federated & pFedAFM & 40 & 85 & 17\raisebox{1pt}{\textcolor{greenRYG}{$\bullet$}} 18\raisebox{1pt}{\textcolor{yellowRYG}{$\bullet$}} 5\raisebox{1pt}{\textcolor{redRYG}{$\bullet$}} FAIL & \checkmark \\
+      028 & Medical Edu. & Subinternship Dir. & 8 & 27 & 1\raisebox{1pt}{\textcolor{greenRYG}{$\bullet$}} 6\raisebox{1pt}{\textcolor{yellowRYG}{$\bullet$}} 1\raisebox{1pt}{\textcolor{redRYG}{$\bullet$}} FAIL & \checkmark \\
+      029 & Chemistry & DFT Clusters & 1 & 7 & 1\raisebox{1pt}{\textcolor{greenRYG}{$\bullet$}} 0\raisebox{1pt}{\textcolor{yellowRYG}{$\bullet$}} 0\raisebox{1pt}{\textcolor{redRYG}{$\bullet$}} PASS & \checkmark \\
+      030 & Optimization & SGD Convergence & 40 & 105 & 10\raisebox{1pt}{\textcolor{greenRYG}{$\bullet$}} 28\raisebox{1pt}{\textcolor{yellowRYG}{$\bullet$}} 2\raisebox{1pt}{\textcolor{redRYG}{$\bullet$}} FAIL & \checkmark \\
+      031 & Physics & LIGO PEMcheck & 40 & 94 & 2\raisebox{1pt}{\textcolor{greenRYG}{$\bullet$}} 37\raisebox{1pt}{\textcolor{yellowRYG}{$\bullet$}} 1\raisebox{1pt}{\textcolor{redRYG}{$\bullet$}} FAIL & \checkmark \\
+      032 & ML Survey & FL Survey & 1 & 5 & 0\raisebox{1pt}{\textcolor{greenRYG}{$\bullet$}} 1\raisebox{1pt}{\textcolor{yellowRYG}{$\bullet$}} 0\raisebox{1pt}{\textcolor{redRYG}{$\bullet$}} WARN & \checkmark \\
+      \bottomrule
+    \end{tabular}
+  \end{table}
+
+  \begin{block}{Key Metrics}
+    \small
+    \centering
+    \textbf{139 tests} all passing \quad | \quad \textbf{996 events} \quad | \quad \textbf{323 verify\_claim calls} \quad | \quad \textbf{36/36} mandatory tool calls completed
+  \end{block}
+\end{frame}
+
+% ════════════════════════════════════════════════════════════════
+% Slide 7 — Failure Cases
+% ════════════════════════════════════════════════════════════════
+\begin{frame}{Failure Case Analysis}
+  \begin{enumerate}
+    \item \textbf{Verifier False Positive (LIGO Q031)}
+    \begin{itemize}
+      \footnotesize
+      \item C036 (GW190707 event) flagged \textcolor{redRYG}{$\bullet$} contradicted
+      \item \textbf{Cause}: Semantic Scholar matched a different paper with overlapping authors
+      \item \textbf{Handling}: Report Caveats explicitly states ``almost certainly a false negative''
+    \end{itemize}
+
+    \item \textbf{Abstract-Only Limitation (SGD Q030)}
+    \begin{itemize}
+      \footnotesize
+      \item C018/C031 mathematical claims unverifiable
+      \item \textbf{Cause}: Theorems/lemmas require full-text, abstracts lack detail
+    \end{itemize}
+
+    \item \textbf{PDF Parser Fallback (Medical Q028)}
+    \begin{itemize}
+      \footnotesize
+      \item \texttt{parse\_pdf} returned 0 claims; Agent auto-fallback to \texttt{bash\_exec}
+      \item \textbf{Cause}: Medical papers indexed via PubMed, not arXiv --- different citation format
+    \end{itemize}
+
+    \item \textbf{Agent Bypassed Toolchain (mid-dev, fixed)}
+    \begin{itemize}
+      \footnotesize
+      \item Early runs: only 10/40 verify\_call, \textbf{0 score\_batch}, \textbf{0 render\_report}
+      \item \textbf{3-iteration fix}: MUST annotations $\rightarrow$ 5-State Machine $\rightarrow$ HARD STOP RULE
+      \item \textbf{Result}: 36/36 compliance across all 6 quests
+    \end{itemize}
+  \end{enumerate}
+\end{frame}
+
+% ════════════════════════════════════════════════════════════════
+% Slide 8 — Boundary Cases
+% ════════════════════════════════════════════════════════════════
+\begin{frame}{Boundary Cases \& Three-Tier Annotation}
+  \begin{columns}[T]
+    \column{0.55\textwidth}
+    \textbf{6 Boundary Cases Covered}
+    \begin{table}[h]
+      \small
+      \begin{tabular}{ll}
+        \toprule
+        Case & Quest \\
+        \midrule
+        Minimal claims (1) & Q029 (DFT PASS) \\
+        Max uncertainty (37/40) & Q031 (LIGO) \\
+        Cross-discipline refs & Q031 (astro-ph format) \\
+        Internal math proofs & Q027/030 \\
+        Multi-citation \texttt{[20]--[24]} & Q027 \\
+        Fake ID detection & \texttt{test\_audit} \\
+        \bottomrule
+      \end{tabular}
+    \end{table}
+
+    \column{0.45\textwidth}
+    \textbf{Three-Tier Annotation}\\
+    (Project core requirement)
+
+    \begin{itemize}
+      \item \texttt{[E001] [E030]} --- Claims \textbf{supported} by evidence ($\textcolor{greenRYG}{\bullet}$ green)
+      \item \texttt{Inferred} --- \textbf{Logically inferred} but not directly proven by cited sources
+      \item \texttt{Needs Verification} --- \textbf{Insufficient evidence}; requires further experiment or manual review
+    \end{itemize}
+
+    \vspace{0.3cm}
+    \texttt{audit\_report()} automatically scans for these annotations and cross-references with \texttt{evidence\_store.json}.
+  \end{columns}
+\end{frame}
+
+% ════════════════════════════════════════════════════════════════
+% Slide 9 — Before/After
+% ════════════════════════════════════════════════════════════════
+\begin{frame}{Before / After Comparison}
+  \begin{table}[h]
+    \footnotesize
+    \begin{tabular}{p{3.5cm}p{5cm}p{5cm}}
+      \toprule
+      Dimension & Before (Original) & After (Our System) \\
+      \midrule
+      Message Recording & QQ logs only, no structure & E00X evidence\_store (16 fields) \\
+      \rowcolor{greenRYG!15}
+      Citation Annotation & None & [E001] + RYG tri-color labels \\
+      Reference Verification & None & S2 / arXiv / Crossref API \\
+      \rowcolor{greenRYG!15}
+      Image Evidence & No metadata & SHA256 + dimensions + format \\
+      PDF Evidence & Not supported & Pages + SHA256 + full-text sidecar \\
+      \rowcolor{greenRYG!15}
+      Audit Capability & Impossible & \texttt{audit\_report} auto fake-ID detection \\
+      Experiment Logging & None & \texttt{memory\_write} structured schema \\
+      \rowcolor{greenRYG!15}
+      Test Coverage & 0 & \textbf{139 tests} / 100\% pass \\
+      Grading Level & C+ (prompt only) & $\ge$ B- (independent MCP toolchain) \\
+      \bottomrule
+    \end{tabular}
+  \end{table}
+\end{frame}
+
+% ════════════════════════════════════════════════════════════════
+% Slide 10 — Limitations
+% ════════════════════════════════════════════════════════════════
+\begin{frame}{Limitations \& Future Work}
+  \begin{columns}[T]
+    \column{0.5\textwidth}
+    \textbf{Current Limitations}
+    \begin{itemize}
+      \footnotesize
+      \item Abstract-only verification: most $\textcolor{yellowRYG}{\bullet}$ resolvable with full-text
+      \item Verifier false positives: $\sim$5--10\% $\textcolor{redRYG}{\bullet}$ may be misclassifications
+      \item PyPDF2 weak on scanned PDFs
+      \item API-dependent: offline mode not supported
+      \item No video/audio support yet
+    \end{itemize}
+
+    \column{0.5\textwidth}
+    \textbf{Future Improvements}
+    \begin{itemize}
+      \footnotesize
+      \item Full-text verification via arXiv open-access
+      \item Local model fallback (Ollama + sentence-transformers)
+      \item Structured NLP pipeline for claim extraction
+      \item Multi-connector support (WeChat, Discord)
+      \item Caching layer to avoid duplicate API calls
+    \end{itemize}
+  \end{columns}
+\end{frame}
+
+% ════════════════════════════════════════════════════════════════
+% Slide 11 — Team
+% ════════════════════════════════════════════════════════════════
+\begin{frame}{Team Contributions}
+  \begin{table}[h]
+    \footnotesize
+    \begin{tabular}{lp{3.5cm}p{6cm}}
+      \toprule
+      Member & Role & Core Contribution \\
+      \midrule
+      Miaoyi Liao & Person A (Tool) & claim\_extractor, semantic\_verifier, HARD STOP RULE, evidence-chain store \\
+      Xiaoyu Xiong & Person B (Scoring) & traffic\_light (7 branches), render (Markdown), MCP 5-tool registration, 6 Quest runs \\
+      Yuxiang Liu & Person C (Integration) & crossdisc\_idea 5-Phase, QQ multi-modal evidence, daemon integration, memory schema \\
+      \bottomrule
+    \end{tabular}
+  \end{table}
+
+  \begin{block}{Cross-Collaboration Highlights}
+    \footnotesize
+    \textbf{Phase 5 Enforcement}: A (HARD STOP RULE) + B (5-State Machine) + C (memory/artifact schema) --- three layers guarantee agent cannot bypass toolchain
+
+    \textbf{Evidence Chain}: A (storage + runner hooks) + B (audit + prompt protocol) + C (QQ multi-modal entry point) --- full-link coverage
+  \end{block}
+\end{frame}
+
+% ════════════════════════════════════════════════════════════════
+% Slide 12 — Summary
+% ════════════════════════════════════════════════════════════════
+\begin{frame}{Summary}
+  \begin{center}
+    \Large
+    \textbf{From ``LLM Writes a Report''\\to ``Agent Calls a Verifiable Toolchain''}
+
+    \vspace{0.6cm}
+    \normalsize
+    \begin{tabular}{ccc}
+      \textbf{Input} & \textbf{Verification} & \textbf{Output} \\
+      \hline
+      6 disciplines & 323 API lookups & RYG colored report \\
+      QQ real interaction & 3-source fallback & Evidence Chain table \\
+      Text + Image + PDF & 139 tests / 100\% & Cross-disc. research ideas \\
+    \end{tabular}
+
+    \vspace{0.6cm}
+    \normalsize
+    \textbf{Grade: $\ge$ B-} (independent MCP toolchain, 36/36 mandatory calls)
+
+    \vspace{0.4cm}
+    \small
+    \url{https://github.com/leoplasture/STA304_Final_Project}
+  \end{center}
+\end{frame}
+
+\end{document}
