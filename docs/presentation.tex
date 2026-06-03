@@ -62,54 +62,32 @@
 % Slide 3 — Architecture
 % ════════════════════════════════════════════════════════════════
 \begin{frame}{System Architecture}
-  \begin{center}
-    \begin{tikzpicture}[node distance=1.4cm and 1.0cm, auto,
-      block/.style={rectangle, draw, fill=lightgray, text width=2.4cm, text centered, minimum height=1.0cm, font=\footnotesize, rounded corners=2pt},
-      rblock/.style={rectangle, draw, fill=greenRYG!10, text width=2.4cm, text centered, minimum height=1.0cm, font=\footnotesize, rounded corners=2pt},
-      arrow/.style={->, >=stealth, thick, darkblue}]
+  \begin{block}{Pipeline Flow}
+    \begin{center}
+      \large
+      \textbf{QQ User} \quad $\longrightarrow$ \quad
+      \textbf{crossdisc\_idea (C)} \quad $\longrightarrow$ \quad
+      \textbf{parse\_pdf (A)} \quad $\longrightarrow$ \quad
+      \textbf{verify\_claim $\times$N (A)}
 
-      % ── Row 1: input + extraction ──
-      \node[block] (qq) {QQ User\\[2pt] Uploads PDF};
-      \node[block, right=of qq] (skill) {crossdisc\_idea\\[2pt] Skill (C)};
-      \node[block, right=of skill] (parse) {parse\_pdf\\[2pt] PyPDF2 (A)};
-      \node[block, right=of parse] (verify) {verify\_claim $\times$N\\[2pt] S2 / arXiv / Crossref (A)};
+      \vspace{0.4cm}
+      \quad\; $\downarrow$ \quad\; \\[0.2cm]
 
-      % ── Row 2: scoring + output ──
-      \node[rblock, below=1.8cm of qq] (score) {score\_batch\\[2pt] $\bullet\bullet\bullet$ RYG (B)};
-      \node[rblock, right=of score] (render) {render\_report\\[2pt] Markdown (B)};
-      \node[rblock, right=of render] (record) {artifact\_record +\\[2pt] memory\_write (C)};
-      \node[rblock, right=of record] (out) {QQ Returns\\[2pt] RYG Report};
-
-      % ── Arrows ──
-      \draw[arrow] (qq) -- (skill);
-      \draw[arrow] (skill) -- (parse);
-      \draw[arrow] (parse) -- (verify);
-      \draw[arrow] (verify.south) -- ++(0,-0.5) -| (score.north);
-      \draw[arrow] (score) -- (render);
-      \draw[arrow] (render) -- (record);
-      \draw[arrow] (record) -- (out);
-      \draw[arrow, bend right=20] (out.north) to (qq.south east);
-    \end{tikzpicture}
-  \end{center}
+      \textbf{QQ Returns} \quad $\longleftarrow$ \quad
+      \textbf{record + memory (C)} \quad $\longleftarrow$ \quad
+      \textbf{render\_report (B)} \quad $\longleftarrow$ \quad
+      \textbf{score\_batch (B)}
+    \end{center}
+  \end{block}
 
   \vspace{0.3cm}
-  \begin{columns}[T]
-    \column{0.33\textwidth}
-    \centering \textbf{A: Tool Layer}\\
-    \footnotesize claim\_extractor\\
-    \footnotesize semantic\_verifier\\
-    \footnotesize HARD STOP RULE
-    \column{0.33\textwidth}
-    \centering \textbf{B: Scoring Layer}\\
-    \footnotesize traffic\_light\\
-    \footnotesize render + MCP reg\\
-    \footnotesize 6 Quest execution
-    \column{0.33\textwidth}
-    \centering \textbf{C: Integration Layer}\\
-    \footnotesize crossdisc\_idea\\
-    \footnotesize QQ evidence recording\\
-    \footnotesize memory schema
-  \end{columns}
+  \begin{block}{Three Roles}
+    \begin{description}
+      \item[Person A --- Tool Layer] \texttt{claim\_extractor}, \texttt{semantic\_verifier} (PyPDF2, S2/arXiv/Crossref API), HARD STOP RULE in \texttt{builder.py}
+      \item[Person B --- Scoring Layer] \texttt{traffic\_light} (7-branch RYG), \texttt{render} (Markdown), MCP 5-tool registration, 6 Quest execution
+      \item[Person C --- Integration Layer] \texttt{crossdisc\_idea} 5-Phase Skill, QQ multi-modal evidence recording, daemon integration, memory schema
+    \end{description}
+  \end{block}
 \end{frame}
 
 % ════════════════════════════════════════════════════════════════
