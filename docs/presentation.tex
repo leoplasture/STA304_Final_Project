@@ -125,21 +125,21 @@
   \begin{columns}[T]
     \column{0.5\textwidth}
     \setlength{\fboxsep}{4pt}
-    {\color{blue!15}\fbox{\begin{minipage}{\dimexpr\linewidth-2\fboxrule-2\fboxsep\relax}
+    \colorbox{blue!18}{\begin{minipage}{\dimexpr\linewidth-2\fboxsep\relax}
       \footnotesize
       \textbf{Phase 0 --- PDF Parsing (A)}\\[2pt]
       PyPDF2 $\to$ regex ``REFERENCES'' $\to$ split by \texttt{[N]} / \texttt{[Author,Year]} $\to$ Unicode title quotes $\to$ truncation at 200K chars, 40 claims. Handles IEEE, APA, named-author.
-    \end{minipage}}}
+    \end{minipage}}
 
-    \vspace{0.12cm}
-    {\color{blue!10}\fbox{\begin{minipage}{\dimexpr\linewidth-2\fboxrule-2\fboxsep\relax}
+    \vspace{0.1cm}
+    \colorbox{blue!12}{\begin{minipage}{\dimexpr\linewidth-2\fboxsep\relax}
       \footnotesize
       \textbf{Phase 1 --- Verify (A) \hspace{0.2cm} \textit{323 calls / 6 quests}}\\[2pt]
       (1) Semantic Scholar $\to$ (2) arXiv Title API $\to$ (3) Crossref DOI. Returns verdict + confidence + evidence snippet.
-    \end{minipage}}}
+    \end{minipage}}
 
-    \vspace{0.12cm}
-    {\color{green!15}\fbox{\begin{minipage}{\dimexpr\linewidth-2\fboxrule-2\fboxsep\relax}
+    \vspace{0.1cm}
+    \colorbox{green!18}{\begin{minipage}{\dimexpr\linewidth-2\fboxsep\relax}
       \footnotesize
       \textbf{Phase 2 --- Score (B) \hspace{0.2cm} \textit{7-branch RYG}}\\[2pt]
       \begin{tabular}{ll}
@@ -147,30 +147,29 @@
         contradicted conf $\ge$ 0.7 & \textcolor{redRYG}{$\bullet$} Red (wrong) \\
         all other combinations & \textcolor{yellowRYG}{$\bullet$} Yellow (uncertain) \\
       \end{tabular}
-    \end{minipage}}}
+    \end{minipage}}
 
     \column{0.5\textwidth}
-    \setlength{\fboxsep}{4pt}
-    {\color{green!12}\fbox{\begin{minipage}{\dimexpr\linewidth-2\fboxrule-2\fboxsep\relax}
+    \colorbox{green!14}{\begin{minipage}{\dimexpr\linewidth-2\fboxsep\relax}
       \footnotesize
       \textbf{Phase 3 --- Render (B)}\\[2pt]
       RYG summary table + per-claim detail cards + Evidence Chain table mapping E00X $\leftrightarrow$ C00X.
-    \end{minipage}}}
+    \end{minipage}}
 
-    \vspace{0.12cm}
-    {\color{orange!12}\fbox{\begin{minipage}{\dimexpr\linewidth-2\fboxrule-2\fboxsep\relax}
+    \vspace{0.1cm}
+    \colorbox{orange!14}{\begin{minipage}{\dimexpr\linewidth-2\fboxsep\relax}
       \footnotesize
       \textbf{Phase 4 --- Persist (C) \hspace{0.2cm} \textit{36/36 calls}}\\[2pt]
       \texttt{artifact\_\_record} $\to$ evidence\_store (auditable). \texttt{memory\_\_write} $\to$ episodes (traceable).
-    \end{minipage}}}
+    \end{minipage}}
 
-    \vspace{0.12cm}
-    {\color{gray!15}\fbox{\begin{minipage}{\dimexpr\linewidth-2\fboxrule-2\fboxsep\relax}
+    \vspace{0.1cm}
+    \colorbox{lightgray}{\begin{minipage}{\dimexpr\linewidth-2\fboxsep\relax}
       \footnotesize
       \textbf{Data Flow \& Enforcement}\\[2pt]
       Claim $\to$ VerificationResult $\to$ ScoredClaimResult $\to$ FactCheckResult.\\[1pt]
       L1: 5-State Machine (SKILL.md). L2: HARD STOP RULE (builder.py).
-    \end{minipage}}}
+    \end{minipage}}
   \end{columns}
 \end{frame}
 
