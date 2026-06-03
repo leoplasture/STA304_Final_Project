@@ -63,33 +63,36 @@
 % ════════════════════════════════════════════════════════════════
 \begin{frame}{System Architecture}
   \begin{center}
-    \begin{tikzpicture}[node distance=0.7cm, auto,
-      block/.style={rectangle, draw, fill=lightgray, text width=2.6cm, text centered, minimum height=0.9cm, font=\footnotesize},
-      mcp/.style={rectangle, draw, fill=greenRYG!10, text width=2.4cm, text centered, minimum height=0.7cm, font=\footnotesize},
-      arrow/.style={->, >=stealth, thick}]
+    \begin{tikzpicture}[node distance=1.4cm and 1.0cm, auto,
+      block/.style={rectangle, draw, fill=lightgray, text width=2.4cm, text centered, minimum height=1.0cm, font=\footnotesize, rounded corners=2pt},
+      rblock/.style={rectangle, draw, fill=greenRYG!10, text width=2.4cm, text centered, minimum height=1.0cm, font=\footnotesize, rounded corners=2pt},
+      arrow/.style={->, >=stealth, thick, darkblue}]
 
-      \node[block] (qq) {QQ User\\Uploads PDF};
-      \node[block, right=of qq] (skill) {crossdisc\_idea\\Skill (Person C)};
-      \node[block, right=of skill] (parse) {parse\_pdf\\(PyPDF2, A)};
-      \node[block, right=of parse] (verify) {verify\_claim $\times N$\\(S2/arXiv/Crossref, A)};
+      % ── Row 1: input + extraction ──
+      \node[block] (qq) {QQ User\\[2pt] Uploads PDF};
+      \node[block, right=of qq] (skill) {crossdisc\_idea\\[2pt] Skill (C)};
+      \node[block, right=of skill] (parse) {parse\_pdf\\[2pt] PyPDF2 (A)};
+      \node[block, right=of parse] (verify) {verify\_claim $\times$N\\[2pt] S2 / arXiv / Crossref (A)};
 
-      \node[block, below=of parse] (score) {score\_batch\\$\textcolor{greenRYG}{\bullet}\textcolor{yellowRYG}{\bullet}\textcolor{redRYG}{\bullet}$ (B)};
-      \node[block, right=of score] (render) {render\_report\\Markdown table (B)};
-      \node[block, right=of render] (record) {artifact\_record +\\memory\_write (C)};
+      % ── Row 2: scoring + output ──
+      \node[rblock, below=1.8cm of qq] (score) {score\_batch\\[2pt] $\bullet\bullet\bullet$ RYG (B)};
+      \node[rblock, right=of score] (render) {render\_report\\[2pt] Markdown (B)};
+      \node[rblock, right=of render] (record) {artifact\_record +\\[2pt] memory\_write (C)};
+      \node[rblock, right=of record] (out) {QQ Returns\\[2pt] RYG Report};
 
+      % ── Arrows ──
       \draw[arrow] (qq) -- (skill);
       \draw[arrow] (skill) -- (parse);
       \draw[arrow] (parse) -- (verify);
-      \draw[arrow] (verify) -- (score);
+      \draw[arrow] (verify.south) -- ++(0,-0.5) -| (score.north);
       \draw[arrow] (score) -- (render);
       \draw[arrow] (render) -- (record);
-
-      \draw[arrow, bend right] (record.east) to (qq.south east);
-      \node[font=\footnotesize] at (9.2, -3.5) {QQ returns RYG report};
+      \draw[arrow] (record) -- (out);
+      \draw[arrow, bend right=20] (out.north) to (qq.south east);
     \end{tikzpicture}
   \end{center}
 
-  \vspace{0.2cm}
+  \vspace{0.3cm}
   \begin{columns}[T]
     \column{0.33\textwidth}
     \centering \textbf{A: Tool Layer}\\
