@@ -160,26 +160,27 @@
 % ═══════════════════ Slide 6 — Evidence Chain ═══════════════════
 \begin{frame}{Evidence Chain: Making Every Claim Auditable}
   \begin{columns}[T]
-    \column{0.42\textwidth}
-    \textbf{3 Evidence Types (E00X system)}
+    \column{0.38\textwidth}
+    \textbf{3 Evidence Types (E00X)}
     \begin{table}[h]
       \footnotesize
-      \begin{tabular}{lll}
+      \begin{tabular}{ll}
         \toprule
-        Source & ID Format & Recorded Metadata \\
+        Source & ID Format \\
         \midrule
-        QQ Text & E001 & text + SHA256 \\
-        QQ Image & E001-img & dims + format + SHA256 \\
-        QQ PDF & E001-pdf & pages + SHA256 + sidecar \\
+        QQ Text & E001 \\
+        QQ Image & E001-img \\
+        QQ PDF & E001-pdf \\
         \bottomrule
       \end{tabular}
     \end{table}
+    {\scriptsize All entries: SHA256 hash. PDF: +page count, +text sidecar.}
 
-    \vspace{0.1cm}
-    \textbf{Report Structure (6 sections)}
-    {\scriptsize §1 FactCheck (RYG), §2 Evidence Chain (E00X$\leftrightarrow$C00X), §3--5 Bridges + hypothesis, §6 Caveats + verifier limits.}
+    \vspace{0.05cm}
+    \textbf{Report Structure}
+    {\scriptsize §1 FactCheck, §2 Evidence Chain, §3--5 Bridges, §6 Caveats.}
 
-    \column{0.55\textwidth}
+    \column{0.59\textwidth}
     \textbf{Audit: \texttt{audit\_report()}}
     \begin{itemize}
       \footnotesize
