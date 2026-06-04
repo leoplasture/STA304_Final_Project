@@ -20,7 +20,7 @@
 \setbeamercolor{structure}{fg=darkblue}
 \setbeamercolor{block title}{fg=white,bg=darkblue}
 
-\title{Literature Citation Verification System\\Based on DeepScientist}
+\title{Literature Citation Verification System\ \\Based on DeepScientist}
 \subtitle{Project A --- Engineering Track: Evidence Chain Module}
 \author[Group 09]{Miaoyi Liao \and Xiaoyu Xiong \and Yuxiang Liu}
 \institute[STA304]{STA304 Final Project · LLMs: From Principles to Applications}
@@ -55,10 +55,10 @@
     \column{0.5\textwidth}
     \textbf{The Scale of the Problem}
     \begin{itemize}
-      \item LLMs generate \textbf{3--27\% fabricated references} in academic writing tasks (Walters \& Wilder, 2023; Bhatt, 2024)
-      \item In scientific peer review, \textbf{up to 69\% of GPT-4 generated reviews} contain hallucinated citations (Liang et al., 2024)
-      \item These fabrications are \textbf{indistinguishable from real citations} without external verification
-      \item For research agents that autonomously generate proposals and ideas, this risk is amplified
+      \item LLMs generate \colorbox{red}{\color{white}3--27\% fabricated references} in academic writing tasks (Walters \& Wilder, 2023; Bhatt, 2024)
+      \item In scientific peer review, \colorbox{red}{\color{white}up to 69\% of GPT-4 generated reviews} contain hallucinated citations (Liang et al., 2024)
+      \item These fabrications are \textbf{indistinguishable from real citations} without external verification. For research agents that autonomously generate proposals and ideas, this risk is amplified
+      % \item For research agents that autonomously generate proposals and ideas, this risk is amplified
     \end{itemize}
 
     \column{0.5\textwidth}
@@ -308,7 +308,7 @@
       v1 & SKILL.md suggests & 0/6 tools & LLMs ignore ``please''\\
       v2 & MUST + code examples & 10/40 verify, 0 score & Agent still cuts corners\\
       v3 & 5-State Machine + exits & Partial fix & Exits help but bypassable\\
-      v4 & \textbf{HARD STOP RULE} & \textbf{36/36} & \textbf{Framework > Prompt}\\
+      v4 & \colorbox{red}{\color{white}HARD STOP RULE} & \textbf{36/36} & \textbf{Framework > Prompt}\\
       \bottomrule
     \end{tabular}
   \end{center}
@@ -438,16 +438,13 @@
 \begin{frame}{Team Contributions}
   \begin{table}[h]
     \footnotesize
-    \begin{tabular}{lp{4cm}p{5.5cm}}
+    \begin{tabular}{lp{3cm}p{6.5cm}}
       \toprule
-      Member \& Role & Scope & Key Deliverables \\
+      Member & Scope & Key Deliverables \\
       \midrule
-      \textbf{Miaoyi Liao} & 4 new + 3 mod files & claim\_extractor, semantic\_verifier (3-API chain), HARD STOP RULE,\\
-      Person A: Tool Layer & $\sim$1,500 loc & evidence-chain store + runner instrumentation \\
-      \textbf{Xiaoyu Xiong} & 3 new + 2 mod files & traffic\_light (7-branch, 24 tests), factcheck\_render, MCP 5-tool\\
-      Person B: Scoring & $\sim$1,200 loc & registration, \textbf{6 Quest execution + all debugging} \\
-      \textbf{Yuxiang Liu} & 3 new + 8 mod files & crossdisc\_idea SKILL.md (5-Phase SM + state machine), QQ evidence\\
-      Person C: Integration & $\sim$800 loc & recording, memory schema, daemon+runner fixes, 16 tests \\
+      \textbf{Miaoyi Liao} (A: Tool) & 4 new + 3 mod, $\sim$1,500 loc & claim\_extractor, semantic\_verifier (3-API), HARD STOP RULE, evidence-chain store \\
+      \textbf{Xiaoyu Xiong} (B: Scoring) & 3 new + 2 mod, $\sim$1,200 loc & traffic\_light (7-branch, 24 tests), factcheck\_render, MCP 5-tool reg, \textbf{6 Quest exec + debug} \\
+      \textbf{Yuxiang Liu} (C: Integration) & 3 new + 8 mod, $\sim$800 loc & crossdisc\_idea SKILL.md (5-Phase SM), QQ evidence, memory schema, daemon+runner fixes, 16 tests \\
       \bottomrule
     \end{tabular}
   \end{table}
@@ -487,3 +484,4 @@
 \end{frame}
 
 \end{document}
+
